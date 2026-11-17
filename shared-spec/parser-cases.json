@@ -1,0 +1,762 @@
+[
+  {
+    "input": "俯卧撑 15次",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15次 x 2",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成]",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "COMPLETE",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15次 x 2 [计数=完成]",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "COMPLETE",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "俯卧撑 15次[计数=完成]",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "COMPLETE",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15 次",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑　15次",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "第 2 组 深蹲 20次",
+    "status": "VALID",
+    "expected": {
+      "name": "第 2 组 深蹲",
+      "type": "COUNT",
+      "target": 20,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 015次",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15次 X 2",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "俯卧撑 15次 ×2",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "俯卧撑 15次x2",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "俯卧撑 2147483647次",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 2147483647,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15次 x 2147483647",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 2147483647
+    }
+  },
+  {
+    "input": "阅读 20分钟",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读 20分",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读 1小时",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 3600000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读 1时",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 3600000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读 90秒",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 90000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "休息 60秒",
+    "status": "VALID",
+    "expected": {
+      "name": "休息",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 60000,
+      "category": "REST",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "休息日规划 20分钟",
+    "status": "VALID",
+    "expected": {
+      "name": "休息日规划",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "REST",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "拉伸 45秒 x 2",
+    "status": "VALID",
+    "expected": {
+      "name": "拉伸",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 45000,
+      "category": "NORMAL",
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "拉伸 45秒 x 2 [分类=休息]",
+    "status": "VALID",
+    "expected": {
+      "name": "拉伸",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 45000,
+      "category": "REST",
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "阅读 20分钟 [分类=休息]",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "REST",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "休息 60秒 [分类=普通]",
+    "status": "VALID",
+    "expected": {
+      "name": "休息",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 60000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "休息 60秒 [分类=休息]",
+    "status": "VALID",
+    "expected": {
+      "name": "休息",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 60000,
+      "category": "REST",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读 20分钟 [分类=普通]",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "拉伸 45秒x2[分类=休息]",
+    "status": "VALID",
+    "expected": {
+      "name": "拉伸",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 45000,
+      "category": "REST",
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "阅读 20分钟 x 2 [分类=休息]",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "REST",
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "休息 60秒 x 2 [分类=普通]",
+    "status": "VALID",
+    "expected": {
+      "name": "休息",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 60000,
+      "category": "NORMAL",
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成] ",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "COMPLETE",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 x",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "拉伸 45秒 x 2 [分类=休",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 abc次",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑15次",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑 15个",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "15次",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 0次",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 -5次",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 x 0",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 x 2.5",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [分类=休息]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [分类=普通]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 20分钟 [计数=完成]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=递增]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 20分钟 [分类=正常]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [foo=bar]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成] [分类=休息]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成] x 2",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成] extra",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成]]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数=完成] x",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "拉伸 45秒 [分类=休息] x 2",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 [计数 = 完成]",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 【计数=完成】",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 2147483648次",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 15次 x 2147483648",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 9223372036854775807秒",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 9223372036854775807小时",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 1.5分钟",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 十五分钟",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 1小时30分钟",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 0秒",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 00秒",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "俯卧撑 00次",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读20分钟",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1200000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "休息60秒",
+    "status": "VALID",
+    "expected": {
+      "name": "休息",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 60000,
+      "category": "REST",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "拉伸45秒x2",
+    "status": "VALID",
+    "expected": {
+      "name": "拉伸",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 45000,
+      "category": "NORMAL",
+      "repeatCount": 2
+    }
+  },
+  {
+    "input": "第2组 深蹲20次",
+    "status": "VALID",
+    "expected": {
+      "name": "第2组 深蹲",
+      "type": "COUNT",
+      "target": 20,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "第2组15次",
+    "status": "VALID",
+    "expected": {
+      "name": "第2组",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "INCREMENT",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "俯卧撑15次[计数=完成]",
+    "status": "VALID",
+    "expected": {
+      "name": "俯卧撑",
+      "type": "COUNT",
+      "target": 15,
+      "countMode": "COMPLETE",
+      "durationMs": null,
+      "category": null,
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读",
+    "status": "INCOMPLETE",
+    "expected": null
+  },
+  {
+    "input": "阅读 1秒",
+    "status": "VALID",
+    "expected": {
+      "name": "阅读",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1000,
+      "category": "NORMAL",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "休息1秒",
+    "status": "VALID",
+    "expected": {
+      "name": "休息",
+      "type": "TIMER",
+      "target": null,
+      "countMode": null,
+      "durationMs": 1000,
+      "category": "REST",
+      "repeatCount": 1
+    }
+  },
+  {
+    "input": "阅读 1.5秒",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 0.5分钟",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 1500毫秒",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读1.5秒 x 2",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "阅读 0.5秒",
+    "status": "INVALID",
+    "expected": null
+  },
+  {
+    "input": "",
+    "status": "EMPTY",
+    "expected": null
+  },
+  {
+    "input": "   ",
+    "status": "EMPTY",
+    "expected": null
+  },
+  {
+    "input": "　",
+    "status": "EMPTY",
+    "expected": null
+  }
+]

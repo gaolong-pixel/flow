@@ -1,0 +1,13 @@
+.DS_Store
+
+# Android local/build artifacts
+android/.gradle/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+
+# iOS local/build artifacts
+ios/build/
+ios/DerivedData/
+**/xcuserdata/
