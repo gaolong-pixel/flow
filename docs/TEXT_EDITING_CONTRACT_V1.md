@@ -59,7 +59,7 @@
 | 字段 | 类型 | V1 要求 |
 |---|---|---|
 | `id` | String | 稳定唯一 ID；创建时生成；不可变；不得由解析器生成。 |
-| `name` | String | 去除首尾空白后非空；不得包含换行；卡片编辑后需规范化。 |
+| `name` | String | 创建/更新时统一去除首尾 Unicode White_Space；trim 后非空；内部空白保留；不得包含换行。 |
 | `type` | COUNT / TIMER | V1 不允许 MANUAL。 |
 | `target` | Int? | 仅 COUNT；`> 0`。 |
 | `countMode` | INCREMENT / COMPLETE? | 仅 COUNT；必填；默认 INCREMENT。 |
@@ -73,6 +73,7 @@
 - COUNT：`target != null && target > 0`；`countMode != null`；`durationMs == null`；`category == null`。
 - TIMER：`durationMs != null && durationMs >= 1000`；`durationMs % 1000 == 0`；`category != null`；`target == null`；`countMode == null`。
 - 所有类型：`repeatCount >= 1`；`id` 非空且在 `RoutineDraft` 内唯一。
+- 名称首尾 Unicode White_Space 不具有业务意义；模型创建和所有编辑入口必须统一 trim，内部空白保留。
 - `MANUAL`：V1 禁止创建、解析、序列化和保存。
 - V1 的时长精度固定为 1 秒：内部仍使用 `durationMs`，但值必须是 1000 的整数倍。非整秒、`毫秒`、小数秒输入一律 INVALID；卡片编辑也只能产生整秒。
 
@@ -87,43 +88,63 @@
 | `repeatCount` | Int | 流程级重复次数；`>= 1`。 |
 | `steps` | List<RoutineStep> | 已确认步骤；按列表顺序执行；每个步骤 ID 唯一。 |
 
-以下状态**不应**塞进持久化的 `RoutineDraft`，而应放在 `RoutineEditorState` 中：原始文本 buffer、解析诊断、编辑模式、最近成功快照、行号到 ID 的映射。这样可以避免把未确认的非法文本当作领域数据保存。
-
 ### 2.4 RoutineEditorState
+
+以下状态**不应**塞进持久化的 `RoutineDraft`，而应放在 `RoutineEditorState` 中：原始文本 buffer、当前解析结果、编辑模式、最近成功快照和同步状态。
+
+当前 Android/iOS 实现字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `draft` | RoutineDraft | 唯一事实来源。 |
-| `textBuffer` | String | 用户原始文本，允许空行、INCOMPLETE、INVALID。 |
-| `lastCommittedSteps` | List<RoutineStep> | **只读快照**：最近成功提交的步骤，用于 ID 匹配与差异计算；不是第二事实来源，禁止作为编辑入口。 |
-| `lastCommittedText` | String | 与 `lastCommittedSteps` 对应的文本（含空行），用于下一次行级 diff。 |
-| `lineBindings` | Map<Int, String> | `lastCommittedText` 的逻辑行号（1 基）到步骤 ID 的映射；空行无映射。 |
-| `diagnostics` | List<LineDiagnostic> | 当前文本的逐行诊断，按行号排序。 |
 | `mode` | TEXT / CARDS | 当前编辑模式。 |
-| `syncState` | SYNCED / TEXT_BLOCKED / SERIALIZATION_ERROR | 文本与草稿的同步状态。 |
-| `draftRevision` | Long | 每次已确认的领域数据变化递增；用于脏状态和“是否需要重新序列化”的判断。 |
-| `persistedRevision` | Long | 可选；最近一次保存成功的 revision，用于未保存提示。 |
+| `draft` | RoutineDraft | 唯一事实来源。 |
+| `textBuffer` | String | 当前文本，允许空行、INCOMPLETE、INVALID。 |
+| `parseResult` | ParseResult | 当前解析结果，包含逐行状态、统计和诊断。 |
+| `syncStatus` | SYNCED / DIRTY / INVALID | 文本与 Draft 的同步状态。 |
+| `lastCommittedSteps` | List<RoutineStep> | **只读快照**：最近成功提交或卡片操作后的步骤，用于 ID 匹配与恢复；不是第二事实来源，禁止作为编辑入口。 |
+| `lastCommittedText` | String | 与 `lastCommittedSteps` 对应的规范化文本；用于脏状态判断，不保留原始格式。 |
 
-计算属性：
+**同步状态：**
 
-- `hasBlockingDiagnostics = diagnostics.any { it.status == INCOMPLETE || it.status == INVALID }`
-- `canEnterCardMode = syncState == SYNCED && !hasBlockingDiagnostics`
-- `isTextDirty = textBuffer != lastCommittedText`
-- `isDraftDirty = draftRevision != persistedRevision`（若使用持久化 revision）
+- `SYNCED`：文本与 Draft 语义一致。
+- `DIRTY`：存在尚未提交的合法文本修改。
+- `INVALID`：当前文本存在 `INCOMPLETE` 或 `INVALID` 阻断错误。
+
+同步状态只表达文本与 Draft 的同步关系，不得与错误类型混用。
+
+> 注意：`INVALID` 同时是解析行状态和编辑同步状态的名称，但两者作用域不同。同步状态 `INVALID` 表示当前文本至少存在一行 `INCOMPLETE`/`INVALID`；它不是错误码，也不能代替 `TEXT_BLOCKED` 等错误类型。
+
+**错误类型：**
+
+`EditorController` 通过独立错误码返回失败，不把错误码塞进 `syncStatus`：
+
+`WRONG_MODE`、`TEXT_BLOCKED`、`DRAFT_INVALID`、`INVALID_STEP`、`DUPLICATE_STEP_ID`、`STEP_NOT_FOUND`、`INVALID_MOVE`、`INVALID_REPEAT_COUNT`、`SERIALIZATION_FAILED`。
+
+失败操作必须保持状态不变，不得出现半更新。
+
+**计算属性：**
+
+- `hasBlockingErrors = parseResult.hasBlockingErrors`
+- `canEnterCards = syncStatus == SYNCED && !hasBlockingErrors`
+- 文本是否为未提交修改可按 `syncStatus == DIRTY` 判断。
+
+当前阶段五实现**不包含** `lineBindings`、`draftRevision` 或 `persistedRevision`。行级诊断由 `parseResult` 提供；ID 匹配由 `StepIdMatcher` 基于语义步骤序列完成。
 
 **`lastCommittedSteps` 的定位**：它只是提交成功后的只读快照。任何编辑（文字或卡片）都只能写 `RoutineDraft`；提交或卡片修改成功后，才刷新该快照。禁止从快照反向修改 `draft`，也不得把快照当作可编辑的第二份步骤列表。
 
-### 2.5 LineDiagnostic
+### 2.5 逐行解析结果
+
+当前实现使用 `ParsedLine`，字段为：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `lineNumber` | Int | 1 基逻辑行号。 |
 | `raw` | String | 该行原始内容（保留用户输入，便于定位）。 |
 | `status` | EMPTY / VALID / INCOMPLETE / INVALID | 行状态。 |
-| `message` | String? | 面向用户的原因；VALID/EMPTY 可为空。 |
-| `code` | String? | 可选稳定错误码，便于双端测试；V1 不强制。 |
+| `step` | StepCandidate? | VALID 时的无 ID 候选步骤。 |
+| `diagnostic` | ParseDiagnostic? | 阻断行的稳定错误码（如 `INVALID_UNIT`）。 |
 
-V1 建议每行只返回一个主要错误，按行号排序；同一行有多个错误时以第一个阻断错误为准。
+V1 不硬编码用户展示文案；UI 层负责把稳定错误码映射为本地化文案。
 
 ---
 
@@ -407,21 +428,22 @@ V1 规则：
 2. 生成逐行诊断；保留 `textBuffer` 原文。
 3. 若存在任何 `INCOMPLETE`/`INVALID`：
    - 不修改 `draft`；
-   - 不修改 `lastCommittedSteps`、`lastCommittedText`、`lineBindings`；快照保持上一次成功提交状态（只读）；
-   - `syncState = TEXT_BLOCKED`；
+   - 不修改 `lastCommittedSteps`、`lastCommittedText`；快照保持上一次成功提交状态（只读）；
+   - `syncStatus = INVALID`；
    - 模式保持 TEXT；
    - 原始文本完整保留，非法行不删除；
-   - 禁止进入卡片模式。
+   - 禁止进入卡片模式；
+   - 此时调用 `commitText()` 返回 `TEXT_BLOCKED` 错误，不改变 Draft。
 4. 若所有非空行均 VALID 或 EMPTY：
    - 提取候选步骤（无 ID）；
    - 与最近成功快照做 ID 匹配（第 6 节）；
    - 为无法匹配的新步骤生成新 UUID；
    - 对每个步骤执行领域校验；
-   - 原子替换 `draft.steps`，按列表索引归一化 `order`；
-   - 提交成功后才刷新只读快照：`lastCommittedSteps = draft.steps 的副本`，并更新 `lastCommittedText = textBuffer`、`lineBindings`；
-   - `syncState = SYNCED`；
-   - 若步骤数据发生变化，`draftRevision++`；仅格式变化不递增，但仍更新 `lastCommittedText`/`lineBindings`。
-5. 任一领域校验失败：视为阻断错误，不提交，保留原草稿与诊断。
+   - 原子替换 `draft.steps`，步骤顺序以列表顺序为准；
+   - 提交成功后才刷新只读快照：`lastCommittedSteps = draft.steps 的副本`，并更新 `lastCommittedText = 规范文本`；
+   - `textBuffer` 更新为规范文本；
+   - `syncStatus = SYNCED`。
+5. 任一领域校验或序列化失败：视为阻断/失败错误，不提交，保留原草稿与诊断；返回独立错误码（如 `DRAFT_INVALID`、`INVALID_STEP`、`SERIALIZATION_FAILED`），不修改同步状态。
 
 ### 5.2 关键约束
 
@@ -429,7 +451,7 @@ V1 规则：
 - 不能因为某行不完整就用“部分解析结果”覆盖已确认步骤集合。
 - 空文档（无步骤）是合法状态：提交空步骤列表；卡片模式允许进入空状态。
 - 仅空行/空白行：提交空步骤列表，不阻断。
-- 提交成功后，原始文本中的格式（空行、属性冗余、单位写法等）仍保留在 `textBuffer`，直到卡片编辑触发规范化序列化。
+- 提交成功后，`textBuffer` 被替换为规范文本；空行、额外空格、冗余属性和单位写法会被规范化。
 - 保存策略：存在阻断错误时是否允许保存“最近成功版本”**待确认**；V1 不建议静默保存旧数据而不提示。
 
 ---
@@ -440,11 +462,9 @@ V1 规则：
 
 ### 6.1 输入
 
-- `oldSteps`：最近成功快照中的步骤（带 ID、order；**只读**，不是可编辑数据源）。
-- `oldText`：`lastCommittedText`。
-- `oldBindings`：`oldText` 行号 → 旧步骤 ID。
-- `newText`：当前 `textBuffer`。
+- `oldSteps`：最近成功快照 `lastCommittedSteps` 中的步骤（带 ID；**只读**，不是可编辑数据源）。
 - `newCandidates`：当前全部 VALID 行解析出的候选步骤（无 ID）。
+- 当前实现不维护 `lineBindings`；LCS 使用每个步骤的规范语义行键，空行不参与步骤匹配。
 
 ### 6.2 语义匹配键
 
@@ -473,12 +493,12 @@ semanticKey = (
 
 **阶段 2：行替换匹配（次优先）**
 
-对阶段 1 后剩余的旧步骤和新候选：
+在阶段 1 之外，使用完整旧步骤序列和新候选序列做 LCS 锚点，再在锚点之间处理剩余步骤：
 
-1. 将 `oldText` 与 `newText` 规范化为逻辑行（保留空行）。
-2. 使用确定性的行级 diff（LCS 或 Myers，双端约定同一平局规则）得到替换/删除/插入区块。
-3. 对每个“替换”区块，按行序把旧行与新行一一配对，最多配对 `min(oldCount, newCount)` 对。
-4. 若旧行绑定了未匹配步骤、新行对应未匹配候选，且 `type` 相同，则把旧 ID 转给新候选。
+1. 将旧步骤序列和新候选序列转换为规范语义行键（每步一行；空行跳过）。
+2. 使用确定性的 LCS 得到锚点，并据此得到替换/删除/插入区块；两端使用同一平局规则（优先删除旧行）。
+3. 对每个“替换”区块，按顺序把剩余旧步骤与新候选一一配对，最多配对 `min(oldCount, newCount)` 对。
+4. 若旧步骤尚未匹配、新候选尚未匹配，且两者 `type` 相同，则把旧 ID 转给新候选。
 5. 空行、无步骤行跳过；纯删除/纯插入不转移 ID。
 6. 已被占用的 ID 不得复用。
 
@@ -556,18 +576,17 @@ semanticKey = (
    - `textBuffer = canonicalText`；
    - `lastCommittedText = canonicalText`；
    - `lastCommittedSteps = draft.steps` 的只读快照；
-   - `lineBindings` 重建（第 i 个步骤对应第 i 行）；
-   - 清空阻断诊断；
-   - `syncState = SYNCED`；
-   - `draftRevision++`。
-7. 序列化失败（如 MANUAL、非法字段、不可表示的时长）：
+   - `parseResult` 更新为规范文本的解析结果；
+   - `syncStatus = SYNCED`。
+7. 序列化失败（如名称含换行、非法字段、不可表示的时长）：
+   - 本次操作返回独立错误码 `SERIALIZATION_FAILED`；
    - 回滚本次卡片变更；
-   - 保留旧 Draft 与旧文本；
-   - `syncState = SERIALIZATION_ERROR`；
+   - 保留旧 Draft、旧文本、旧快照和旧解析结果；
+   - 不修改 `syncStatus`；
    - 向用户显示具体步骤和原因；
    - 不允许带着该错误离开卡片模式。
 8. 若卡片操作是 no-op（数据未变化），不重写文本，避免无意义格式化。
-9. 流程名称/流程重复只修改 Draft，不影响文本；仍应更新脏状态。
+9. 当前阶段五 Controller 未实现流程名称/流程重复的卡片更新接口；后续 UI/流程编辑层接入时，流程名称或重复次数只修改 Draft，不影响文本。
 
 ### 7.3 格式化影响
 
@@ -579,13 +598,14 @@ semanticKey = (
 
 ## 8. 模式切换
 
-- `TEXT → CARDS`：仅当 `syncState == SYNCED` 且没有 `INCOMPLETE`/`INVALID` 时允许。
-  - 有错误时保持 TEXT，展示行号与原因，不切换。
+- `TEXT → CARDS`：仅当 `syncStatus == SYNCED` 且没有 `INCOMPLETE`/`INVALID` 时允许。
+  - `DIRTY`/`INVALID` 时拒绝切换，保持 TEXT，展示行号与原因。
   - 空草稿允许进入卡片模式，显示空状态。
-- `CARDS → TEXT`：总是允许；若存在未序列化的步骤变更，先序列化；序列化失败则留在 CARDS 并显示错误。
-- 模式切换本身不得重新解析文本、不得重新分配 ID、不得改变步骤顺序。
+- `CARDS → TEXT`：尝试对当前 Draft 执行完整序列化；成功后切换并更新规范文本，失败则返回 `SERIALIZATION_FAILED` 并留在 CARDS。
+- `TEXT → CARDS` 不重新解析文本；`CARDS → TEXT` 使用序列化后的规范文本生成新的 `parseResult`，但不重新匹配或分配 ID。
+- 模式切换本身不得重新分配 ID、不得改变步骤顺序。
 - 若切换前文本刚提交，直接使用 `RoutineDraft`；不需要再次 parse。
-- 若卡片模式下没有实际修改，切回 TEXT 时保留原 `textBuffer`，避免无意义规范化。
+- CARDS 模式下文本与 Draft 始终同步，切回 TEXT 时使用当前规范文本。
 
 ---
 
@@ -645,7 +665,7 @@ semanticKey = (
 ### RoutineStep
 
 - `id` 非空且唯一。
-- `name.trim()` 非空；不含 `\r`/`\n`。
+- `name` 在模型边界统一 trim；trim 后非空；不含 `\r`/`\n`。
 - `type` 仅 COUNT/TIMER；MANUAL 拒绝。
 - COUNT：`target > 0`；`countMode != null`；`durationMs == null`；`category == null`。
 - TIMER：`durationMs >= 1000`；`durationMs % 1000 == 0`；`category != null`；`target == null`；`countMode == null`。

@@ -3,7 +3,7 @@
 - Routine：用户保存的流程模板，包含流程名称、流程级重复次数和步骤列表。
 - RoutineStep：模板中的一个步骤，包含稳定 ID、类型、名称、类型参数、步骤重复次数和顺序。
 - RoutineDraft：编辑期间的唯一事实来源，保存已确认的流程名称、流程级重复次数和步骤列表；它是唯一可被编辑的权威数据。
-- RoutineEditorState：编辑会话状态，包裹 RoutineDraft，并保存原始文本 buffer、最近成功解析快照、诊断、编辑模式和行号到步骤 ID 的映射。文本 buffer 和快照都不是第二事实来源。
+- RoutineEditorState：编辑会话状态，包裹 RoutineDraft，并保存原始文本 buffer、当前解析结果、最近成功提交的只读步骤快照、编辑模式和同步状态。文本 buffer 和快照都不是第二事实来源。当前实现不包含 lineBindings、draftRevision 或 persistedRevision。
 - ExecutionSession：后续阶段的运行实例。
 
 完整的文本语法、序列化、状态与 ID 匹配规则见 [文本与卡片双向编辑契约 V1.1](TEXT_EDITING_CONTRACT_V1.md)。
@@ -50,21 +50,36 @@
 - `INCOMPLETE`：输入可能尚未完成，例如裸名称 `俯卧撑`/`阅读`、`俯卧撑 15`、`俯卧撑 15次 x`、未闭合属性。
 - `INVALID`：明确不符合语法或语义，例如未知单位、未知属性、数值非法、属性类型不匹配、小数秒/毫秒。
 - 解析器逐行返回结果，不得因一行错误丢弃其他行，也不得丢弃空行而改变行号。
-- 存在 INCOMPLETE 或 INVALID 时：保留用户原始文本，保留最近一次成功解析的步骤集合（只读快照），不得部分提交，不得进入卡片模式；修复全部错误后才允许同步。
+- 存在 INCOMPLETE 或 INVALID 时：`syncStatus = INVALID`；保留用户原始文本，保留最近一次成功解析的步骤集合（只读快照），不得部分提交，不得进入卡片模式；修复全部错误后才允许提交。
+- `commitText()` 在存在阻断错误时返回 `TEXT_BLOCKED`，不修改 Draft 或快照。
+
+## 编辑同步状态
+
+- `SYNCED`：文本与 Draft 语义一致。
+- `DIRTY`：存在尚未提交的合法文本修改。
+- `INVALID`：当前文本存在 INCOMPLETE 或 INVALID 阻断错误。
+
+同步状态只表达文本与 Draft 的同步关系，不得与错误类型混用。解析行状态的 `INVALID` 与同步状态的 `INVALID` 作用域不同，不能互相替代。
+
+错误类型独立于同步状态，当前实现包括：
+
+`WRONG_MODE`、`TEXT_BLOCKED`、`DRAFT_INVALID`、`INVALID_STEP`、`DUPLICATE_STEP_ID`、`STEP_NOT_FOUND`、`INVALID_MOVE`、`INVALID_REPEAT_COUNT`、`SERIALIZATION_FAILED`。
 
 ## 编辑一致性
 
 - `RoutineDraft` 保存已确认数据：模板 ID、名称、流程级重复次数、步骤列表。
-- `RoutineEditorState` 保存编辑期状态：原始文本 buffer、最近成功快照、诊断、模式、同步状态、行号映射。
+- `RoutineEditorState` 保存编辑期状态：`mode`、`draft`、`textBuffer`、`parseResult`、`syncStatus`、`lastCommittedSteps`、`lastCommittedText`。
 - 文本提交是全有或全无：只要有一行阻断错误，其他合法行的修改也不提交。
-- 卡片编辑成功后立即更新文本 buffer；文本被替换为规范化文本，空行和格式会被规范化。
+- 合法文本提交成功后，`textBuffer` 被替换为规范化文本，`syncStatus = SYNCED`，并刷新只读快照。
+- 卡片编辑成功后立即更新文本 buffer；文本被替换为规范化文本，空行和格式会被规范化，`syncStatus = SYNCED`。
 - 卡片类型变更按 ID 更新，清理旧类型字段并写入新类型字段；ID 不变。
-- 模式切换不得重新分配 ID；卡片模式在存在阻断错误时不可进入。
+- 模式切换不得重新分配 ID；`TEXT → CARDS` 仅允许在 `SYNCED` 且无阻断错误时进行。
 - 空草稿、仅空行文本是合法状态；卡片模式显示空状态。
+- 卡片操作或序列化失败时，`EditorController` 返回独立错误码，Draft、文本、快照和模式保持不变。
 
 ## 校验
 
-- 步骤名称去除首尾空白后非空，且不含换行。
+- 步骤名称的首尾 Unicode 空白不具有业务意义：创建和编辑入口统一 trim；trim 后非空；内部空白保留；名称不得包含换行。
 - COUNT 不允许 `category`；TIMER 不允许 `target`/`countMode`。
 - TIMER 的 `category` 必须非空；COUNT 的 `countMode` 必须非空。
 - `repeatCount >= 1`；`target > 0`；`durationMs >= 1000` 且 `durationMs % 1000 == 0`。

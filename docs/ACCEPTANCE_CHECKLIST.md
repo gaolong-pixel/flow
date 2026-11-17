@@ -69,6 +69,7 @@
 
 - [ ] 所有非空行 VALID 时才提交步骤
 - [ ] 有 INCOMPLETE/INVALID 时不修改 Draft
+- [ ] 有 INCOMPLETE/INVALID 时编辑同步状态为 INVALID
 - [ ] 有错误时保留原始文本，非法行不被删除
 - [ ] 有错误时保留最近一次成功解析的步骤集合（只读快照）
 - [ ] `lastCommittedSteps` 只读，不作为编辑入口或第二事实来源
@@ -76,8 +77,24 @@
 - [ ] 修复全部错误后一次性提交全部合法行
 - [ ] 不因一行错误而部分提交其他合法行
 - [ ] 空文本/仅空行提交空步骤列表，卡片模式显示空状态
-- [ ] 提交后 order 按列表索引连续归一化
+- [ ] 提交后步骤顺序以列表顺序为准（当前模型不持久化独立 order）
 - [ ] 解析成功但领域校验失败时不提交，并显示阻断错误
+
+## 编辑同步状态与错误码
+
+- [ ] 初始状态为 SYNCED
+- [ ] 合法但未提交的文本修改为 DIRTY
+- [ ] 存在 INCOMPLETE/INVALID 行时为 INVALID
+- [ ] 文本提交成功后为 SYNCED，且 textBuffer 为规范文本
+- [ ] 卡片操作成功后立即为 SYNCED，且 textBuffer 为规范文本
+- [ ] DIRTY/INVALID 时禁止 `TEXT → CARDS`
+- [ ] SYNCED 时允许 `TEXT → CARDS`
+- [ ] `CARDS → TEXT` 序列化成功后切换，失败时状态不变
+- [ ] 同步状态只使用 SYNCED / DIRTY / INVALID
+- [ ] 错误码独立于同步状态：TEXT_BLOCKED、DRAFT_INVALID、INVALID_STEP、DUPLICATE_STEP_ID、STEP_NOT_FOUND、INVALID_MOVE、INVALID_REPEAT_COUNT、SERIALIZATION_FAILED、WRONG_MODE
+- [ ] 任一失败操作不修改 Draft、textBuffer、lastCommittedSteps、parseResult、mode 或 syncStatus
+- [ ] 当前实现不维护 lineBindings、draftRevision、persistedRevision
+- [ ] 解析行状态的 INVALID 与编辑同步状态的 INVALID 按各自作用域使用，不混用
 
 ## 步骤 ID 稳定性
 

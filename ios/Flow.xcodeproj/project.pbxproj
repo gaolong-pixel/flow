@@ -8,20 +8,84 @@
 
 /* Begin PBXBuildFile section */
 		1D8D63BA11BC3ED7AF56A2B5 /* FlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA01D5BB9913A7EDB79665 /* FlowApp.swift */; };
+		625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */; };
+		6F0EB98F6936F96A7EEE0691 /* RoutineTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */; };
+		780A29047809E4BAAD9C0E22 /* RoutineDomainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */; };
+		84D0AAE24220F61A5F059A65 /* RoutineTextSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21088242D0EB8C895955431F /* RoutineTextSerializer.swift */; };
+		9008BCC2E7AEE949C5AB2768 /* FlowEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */; };
+		902C341CD21122EA332D08A8 /* ParseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9478F4BE53A3F55848DA254 /* ParseModels.swift */; };
+		B8835920792E779AC3E0FA1B /* RoutineStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 762167171614C6A30DDABEE1 /* RoutineStep.swift */; };
 		BD2AFF41382ECADEE8D76B95 /* FlowRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */; };
+		C51E080F211AA0E3B59FA43E /* TextWhitespace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B74E97910E645A768901C8 /* TextWhitespace.swift */; };
+		CCC9E9F58435FBD81410C136 /* CardStepEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECD85403D9C5E983C443406 /* CardStepEditorView.swift */; };
+		CD7036DC3FCEB68EF8BED08C /* RoutineDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94DFE7EC867DB498F4B24A85 /* RoutineDraft.swift */; };
+		CDB67A730B9857826BB3E946 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E8DFD802D29577291A5605C /* Routine.swift */; };
+		D5A03B4A7ACF441ADE0EE8D2 /* StepIDMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3451BEF383FDCFC02341C20B /* StepIDMatcher.swift */; };
+		D90E940DBAC88ABE8E1C1844 /* DomainTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37EB38B7ECF895B6A2EC9069 /* DomainTypes.swift */; };
+		E44F88F79FFF20D5FF179064 /* EditorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39088489F0DF1432B992B82D /* EditorController.swift */; };
+		E725B64EC8318DA24DFB7D3A /* EditorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60077F034A345D5A6D7109F3 /* EditorState.swift */; };
+		F69D315B54FA8DCD0C50CA41 /* ParserSerializerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CBA7E02CF45F693DEEEC89A0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2AA6D7BA5D8BD56A395381D5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 582133B0091E7B797566D191;
+			remoteInfo = Flow;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDomainTests.swift; sourceTree = "<group>"; };
 		1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowRootView.swift; sourceTree = "<group>"; };
+		21088242D0EB8C895955431F /* RoutineTextSerializer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineTextSerializer.swift; sourceTree = "<group>"; };
+		3451BEF383FDCFC02341C20B /* StepIDMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepIDMatcher.swift; sourceTree = "<group>"; };
+		37EB38B7ECF895B6A2EC9069 /* DomainTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainTypes.swift; sourceTree = "<group>"; };
+		39088489F0DF1432B992B82D /* EditorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorController.swift; sourceTree = "<group>"; };
+		60077F034A345D5A6D7109F3 /* EditorState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorState.swift; sourceTree = "<group>"; };
+		65B74E97910E645A768901C8 /* TextWhitespace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextWhitespace.swift; sourceTree = "<group>"; };
+		762167171614C6A30DDABEE1 /* RoutineStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineStep.swift; sourceTree = "<group>"; };
 		7C05D1C3683EFAEC836826DC /* Flow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Flow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8E8DFD802D29577291A5605C /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
+		8ECD85403D9C5E983C443406 /* CardStepEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStepEditorView.swift; sourceTree = "<group>"; };
+		94DFE7EC867DB498F4B24A85 /* RoutineDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDraft.swift; sourceTree = "<group>"; };
 		95FA01D5BB9913A7EDB79665 /* FlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp.swift; sourceTree = "<group>"; };
+		A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSerializerTests.swift; sourceTree = "<group>"; };
+		B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowEditorModel.swift; sourceTree = "<group>"; };
+		C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineTextParser.swift; sourceTree = "<group>"; };
+		E8D296822B861C00CC436CE9 /* FlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorControllerTests.swift; sourceTree = "<group>"; };
+		F9478F4BE53A3F55848DA254 /* ParseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParseModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		026A50B0F5DC40D43680538E /* FlowAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */,
+				A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */,
+				0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */,
+			);
+			path = FlowAppTests;
+			sourceTree = "<group>";
+		};
+		0A1A03E0A19A842ECFECEFDB /* Parser */ = {
+			isa = PBXGroup;
+			children = (
+				F9478F4BE53A3F55848DA254 /* ParseModels.swift */,
+				C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */,
+				21088242D0EB8C895955431F /* RoutineTextSerializer.swift */,
+			);
+			path = Parser;
+			sourceTree = "<group>";
+		};
 		12E09804F282BABC47EBF4CF /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				7C05D1C3683EFAEC836826DC /* Flow.app */,
+				E8D296822B861C00CC436CE9 /* FlowTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -29,23 +93,51 @@
 		3C035241883BCB537D0F71FE /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
+				8ECD85403D9C5E983C443406 /* CardStepEditorView.swift */,
+				B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */,
 				1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */,
 			);
 			path = Presentation;
+			sourceTree = "<group>";
+		};
+		3CFA3003861AD042EF8AFAAB /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				39088489F0DF1432B992B82D /* EditorController.swift */,
+				60077F034A345D5A6D7109F3 /* EditorState.swift */,
+				3451BEF383FDCFC02341C20B /* StepIDMatcher.swift */,
+			);
+			path = Editor;
 			sourceTree = "<group>";
 		};
 		C3DBD8A85E3100385348A5C6 = {
 			isa = PBXGroup;
 			children = (
 				E263EE4334EA695C769C7F18 /* FlowApp */,
+				026A50B0F5DC40D43680538E /* FlowAppTests */,
 				12E09804F282BABC47EBF4CF /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		E11DD6E74053CECCE99DFCD1 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				37EB38B7ECF895B6A2EC9069 /* DomainTypes.swift */,
+				8E8DFD802D29577291A5605C /* Routine.swift */,
+				94DFE7EC867DB498F4B24A85 /* RoutineDraft.swift */,
+				762167171614C6A30DDABEE1 /* RoutineStep.swift */,
+				65B74E97910E645A768901C8 /* TextWhitespace.swift */,
+				3CFA3003861AD042EF8AFAAB /* Editor */,
+				0A1A03E0A19A842ECFECEFDB /* Parser */,
+			);
+			path = Domain;
 			sourceTree = "<group>";
 		};
 		E263EE4334EA695C769C7F18 /* FlowApp */ = {
 			isa = PBXGroup;
 			children = (
 				95FA01D5BB9913A7EDB79665 /* FlowApp.swift */,
+				E11DD6E74053CECCE99DFCD1 /* Domain */,
 				3C035241883BCB537D0F71FE /* Presentation */,
 			);
 			path = FlowApp;
@@ -70,6 +162,24 @@
 			productName = Flow;
 			productReference = 7C05D1C3683EFAEC836826DC /* Flow.app */;
 			productType = "com.apple.product-type.application";
+		};
+		60E39D864D8F99277AEBCA03 /* FlowTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1E2D89DD1A53967C72B3C261 /* Build configuration list for PBXNativeTarget "FlowTests" */;
+			buildPhases = (
+				F67F06C61B78E387B568F959 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C1DCC4001B5387E6DAAB1788 /* PBXTargetDependency */,
+			);
+			name = FlowTests;
+			packageProductDependencies = (
+			);
+			productName = FlowTests;
+			productReference = E8D296822B861C00CC436CE9 /* FlowTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -101,6 +211,7 @@
 			projectRoot = "";
 			targets = (
 				582133B0091E7B797566D191 /* Flow */,
+				60E39D864D8F99277AEBCA03 /* FlowTests */,
 			);
 		};
 /* End PBXProject section */
@@ -110,12 +221,43 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCC9E9F58435FBD81410C136 /* CardStepEditorView.swift in Sources */,
+				D90E940DBAC88ABE8E1C1844 /* DomainTypes.swift in Sources */,
+				E44F88F79FFF20D5FF179064 /* EditorController.swift in Sources */,
+				E725B64EC8318DA24DFB7D3A /* EditorState.swift in Sources */,
 				1D8D63BA11BC3ED7AF56A2B5 /* FlowApp.swift in Sources */,
+				9008BCC2E7AEE949C5AB2768 /* FlowEditorModel.swift in Sources */,
 				BD2AFF41382ECADEE8D76B95 /* FlowRootView.swift in Sources */,
+				902C341CD21122EA332D08A8 /* ParseModels.swift in Sources */,
+				CDB67A730B9857826BB3E946 /* Routine.swift in Sources */,
+				CD7036DC3FCEB68EF8BED08C /* RoutineDraft.swift in Sources */,
+				B8835920792E779AC3E0FA1B /* RoutineStep.swift in Sources */,
+				6F0EB98F6936F96A7EEE0691 /* RoutineTextParser.swift in Sources */,
+				84D0AAE24220F61A5F059A65 /* RoutineTextSerializer.swift in Sources */,
+				D5A03B4A7ACF441ADE0EE8D2 /* StepIDMatcher.swift in Sources */,
+				C51E080F211AA0E3B59FA43E /* TextWhitespace.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F67F06C61B78E387B568F959 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */,
+				F69D315B54FA8DCD0C50CA41 /* ParserSerializerTests.swift in Sources */,
+				780A29047809E4BAAD9C0E22 /* RoutineDomainTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C1DCC4001B5387E6DAAB1788 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 582133B0091E7B797566D191 /* Flow */;
+			targetProxy = CBA7E02CF45F693DEEEC89A0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		0149FC17B79E23BFA5D1828A /* Debug */ = {
@@ -180,6 +322,25 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
+		};
+		0ED085D55F19C54CA1160F9F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.flow.app.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flow.app/Flow";
+			};
+			name = Release;
 		};
 		3891A116B2A789B1EF826D8B /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -263,6 +424,25 @@
 			};
 			name = Release;
 		};
+		6382D9EFA210EDB21CE4B0BC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.flow.app.tests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flow.app/Flow";
+			};
+			name = Debug;
+		};
 		CBFA6DECCA0D9979D5698794 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -292,6 +472,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1E2D89DD1A53967C72B3C261 /* Build configuration list for PBXNativeTarget "FlowTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6382D9EFA210EDB21CE4B0BC /* Debug */,
+				0ED085D55F19C54CA1160F9F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		CB4A80344CE12B2568C1E711 /* Build configuration list for PBXProject "Flow" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

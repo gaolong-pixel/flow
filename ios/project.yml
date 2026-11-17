@@ -35,12 +35,32 @@ targets:
         ENABLE_PREVIEWS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+  FlowTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: FlowAppTests
+    dependencies:
+      - target: Flow
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.flow.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Flow.app/Flow"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
   Flow:
     build:
       targets:
         Flow: all
+        FlowTests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - FlowTests
     archive:
       config: Release

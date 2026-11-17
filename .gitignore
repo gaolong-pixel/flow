@@ -11,3 +11,6 @@ android/.idea/
 ios/build/
 ios/DerivedData/
 **/xcuserdata/
+
+# Local debug signing artifacts
+**/debug.keystore

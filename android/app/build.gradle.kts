@@ -16,15 +16,6 @@ android {
         versionName = "0.1.0"
     }
 
-    signingConfigs {
-        getByName("debug") {
-            storeFile = file("../keystore/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -52,12 +43,25 @@ android {
         kotlinCompilerExtensionVersion = "1.4.8"
     }
 
+    testOptions {
+        unitTests.all {
+            it.systemProperty(
+                "flow.sharedSpecFile",
+                rootProject.file("../shared-spec/parser-cases.json").absolutePath
+            )
+        }
+    }
+
     // The Phase 1 V0 sources under src/main/java are kept for reference only.
     // The runnable Phase 2 app lives in src/main/kotlin and is the only source set.
     sourceSets {
         getByName("main") {
             java.setSrcDirs(listOf("src/main/kotlin"))
             kotlin.setSrcDirs(listOf("src/main/kotlin"))
+        }
+        getByName("test") {
+            java.setSrcDirs(listOf("src/test/kotlin"))
+            kotlin.setSrcDirs(listOf("src/test/kotlin"))
         }
     }
 }
@@ -70,4 +74,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
