@@ -23,6 +23,8 @@ enum ExecutionControllerError: Error, Equatable {
     case countModeNotIncrement
     case countAlreadyAtTarget
     case invalidCountState
+    case countModeNotComplete
+    case completeAlreadyConfirmed
 }
 
 struct ExecutionControllerSnapshot {
@@ -38,6 +40,12 @@ enum ExecutionControllerResult {
 enum ExecutionControllerCreateResult {
     case success(ExecutionController)
     case failure(ExecutionControllerError)
+}
+
+enum StepActionResult {
+    case completed(session: ExecutionSession, revision: Int64)
+    case skipped(session: ExecutionSession, revision: Int64)
+    case failure(error: ExecutionControllerError, revision: Int64)
 }
 
 enum CountIncrementResult {
@@ -153,6 +161,99 @@ final class ExecutionController {
         }
     }
 
+    func confirmComplete(expectedRevision: Int64) -> StepActionResult {
+        if expectedRevision != revisionValue {
+            return .failure(error: .staleOperation, revision: revisionValue)
+        }
+        if session.status == .completed || session.status == .cancelled {
+            return .failure(error: .terminalSession, revision: revisionValue)
+        }
+        guard session.status == .running else {
+            return .failure(error: .sessionNotRunning, revision: revisionValue)
+        }
+
+        let step = session.routineSnapshot.steps[session.progress.currentStepIndex]
+        guard step.type == .count else {
+            return .failure(error: .notCountStep, revision: revisionValue)
+        }
+        guard step.countMode == .complete else {
+            return .failure(error: .countModeNotComplete, revision: revisionValue)
+        }
+        guard !session.progress.completeConfirmed else {
+            return .failure(error: .completeAlreadyConfirmed, revision: revisionValue)
+        }
+        guard let roundStart = session.currentRoundStartedAt else {
+            return .failure(error: .invalidSessionState, revision: revisionValue)
+        }
+        let now = clock.now
+        guard now >= 0 else {
+            return .failure(error: .invalidTimestamp, revision: revisionValue)
+        }
+
+        let completion = StepRoundResult(
+            outcome: .completed,
+            startedAt: roundStart,
+            endedAt: now
+        )
+        do {
+            let next = try session.confirmComplete(completion)
+            session = next
+            revisionValue += 1
+            return .completed(session: next, revision: revisionValue)
+        } catch let error as ExecutionValidationError {
+            return stepFailure(
+                error == .invalidTimestamp ? .invalidTimestamp : .invalidSessionState
+            )
+        } catch let error as SchedulingError {
+            return stepFailure(
+                error == .invalidResultTimestamp ? .invalidTimestamp : .invalidSessionState
+            )
+        } catch {
+            return stepFailure(.invalidSessionState)
+        }
+    }
+
+    func skipCurrentRound(expectedRevision: Int64) -> StepActionResult {
+        if expectedRevision != revisionValue {
+            return .failure(error: .staleOperation, revision: revisionValue)
+        }
+        if session.status == .completed || session.status == .cancelled {
+            return .failure(error: .terminalSession, revision: revisionValue)
+        }
+        guard session.status == .running else {
+            return .failure(error: .sessionNotRunning, revision: revisionValue)
+        }
+        guard let roundStart = session.currentRoundStartedAt else {
+            return .failure(error: .invalidSessionState, revision: revisionValue)
+        }
+        let now = clock.now
+        guard now >= 0 else {
+            return .failure(error: .invalidTimestamp, revision: revisionValue)
+        }
+
+        let completion = StepRoundResult(
+            outcome: .skipped,
+            startedAt: roundStart,
+            endedAt: now
+        )
+        do {
+            let next = try session.skipCurrentRound(completion)
+            session = next
+            revisionValue += 1
+            return .skipped(session: next, revision: revisionValue)
+        } catch let error as ExecutionValidationError {
+            return stepFailure(
+                error == .invalidTimestamp ? .invalidTimestamp : .invalidSessionState
+            )
+        } catch let error as SchedulingError {
+            return stepFailure(
+                error == .invalidResultTimestamp ? .invalidTimestamp : .invalidSessionState
+            )
+        } catch {
+            return stepFailure(.invalidSessionState)
+        }
+    }
+
     func pause(expectedRevision: Int64) -> ExecutionControllerResult {
         if let stale = staleFailure(expectedRevision) { return stale }
         if let terminal = terminalFailure() { return terminal }
@@ -239,6 +340,10 @@ final class ExecutionController {
     }
 
     private func countFailure(_ error: ExecutionControllerError) -> CountIncrementResult {
+        .failure(error: error, revision: revisionValue)
+    }
+
+    private func stepFailure(_ error: ExecutionControllerError) -> StepActionResult {
         .failure(error: error, revision: revisionValue)
     }
 }

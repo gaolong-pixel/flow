@@ -10,6 +10,7 @@
 		01A5F6163574ACAD738D4BF4 /* ExecutionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08AEE78D1AD9CD68FF37BEA2 /* ExecutionTypes.swift */; };
 		1D8D63BA11BC3ED7AF56A2B5 /* FlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA01D5BB9913A7EDB79665 /* FlowApp.swift */; };
 		46C02255071A0029715AC2D6 /* ExecutionSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D2D4DA7BB72FD9C565D14C5 /* ExecutionSessionTests.swift */; };
+		561E10F348E7E8811A2F1546 /* ExecutionCompleteSkipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7AFDB85EEF36051652321F /* ExecutionCompleteSkipTests.swift */; };
 		625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */; };
 		6F0EB98F6936F96A7EEE0691 /* RoutineTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */; };
 		780A29047809E4BAAD9C0E22 /* RoutineDomainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */; };
@@ -70,6 +71,7 @@
 		A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionScheduling.swift; sourceTree = "<group>"; };
 		B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowEditorModel.swift; sourceTree = "<group>"; };
 		C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineTextParser.swift; sourceTree = "<group>"; };
+		CC7AFDB85EEF36051652321F /* ExecutionCompleteSkipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionCompleteSkipTests.swift; sourceTree = "<group>"; };
 		DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionController.swift; sourceTree = "<group>"; };
 		E8D296822B861C00CC436CE9 /* FlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorControllerTests.swift; sourceTree = "<group>"; };
@@ -81,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */,
+				CC7AFDB85EEF36051652321F /* ExecutionCompleteSkipTests.swift */,
 				A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */,
 				602DF1E437AC678BDC092090 /* ExecutionCountingTests.swift */,
 				722CA512C2F1BDC9CEC7CD54 /* ExecutionSchedulingTests.swift */,
@@ -280,6 +283,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */,
+				561E10F348E7E8811A2F1546 /* ExecutionCompleteSkipTests.swift in Sources */,
 				8C072BB5BF69BC90A6B1A127 /* ExecutionControllerTests.swift in Sources */,
 				808616FCC49FCE12C111992A /* ExecutionCountingTests.swift in Sources */,
 				C77242796D95B76301842B30 /* ExecutionSchedulingTests.swift in Sources */,

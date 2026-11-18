@@ -122,6 +122,48 @@ struct ExecutionSession {
         return try targetSession.commitStepResult(completion)
     }
 
+    /// Atomically confirms the current COUNT + COMPLETE round.
+    ///
+    /// The completeConfirmed candidate is internal and never returned directly;
+    /// only the final Session produced by `commitStepResult` is exposed.
+    func confirmComplete(_ completion: StepRoundResult) throws -> ExecutionSession {
+        try rejectTerminal()
+        try requireStatus(.running)
+        guard completion.outcome == .completed else {
+            throw ExecutionValidationError.invalidRecord
+        }
+
+        let step = routineSnapshot.steps[progress.currentStepIndex]
+        guard step.type == .count, step.countMode == .complete else {
+            throw ExecutionValidationError.invalidStatus
+        }
+        guard !progress.completeConfirmed else {
+            throw ExecutionValidationError.invalidCompleteConfirmed
+        }
+
+        let confirmed = try copy(
+            progress: ExecutionProgress(
+                routineIteration: progress.routineIteration,
+                currentStepIndex: progress.currentStepIndex,
+                currentStepID: progress.currentStepID,
+                stepIteration: progress.stepIteration,
+                currentCount: progress.currentCount,
+                completeConfirmed: true
+            )
+        )
+        return try confirmed.commitStepResult(completion)
+    }
+
+    /// Atomically skips the current round for any step type.
+    func skipCurrentRound(_ completion: StepRoundResult) throws -> ExecutionSession {
+        try rejectTerminal()
+        try requireStatus(.running)
+        guard completion.outcome == .skipped else {
+            throw ExecutionValidationError.invalidRecord
+        }
+        return try commitStepResult(completion)
+    }
+
     /// Low-level state operation for tests and internal model composition.
     /// It appends a record without advancing progress and is not a scheduling
     /// entry point. Normal execution must use `commitStepResult`.

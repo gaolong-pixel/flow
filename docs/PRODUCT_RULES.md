@@ -96,6 +96,16 @@
 - 暂停、取消、完成状态禁止计数；COUNT + COMPLETE、非 COUNT 步骤禁止调用 INCREMENT。
 - 过期 revision、非法计数状态或调度提交失败不得改变 Session 或 revision。
 
+## COUNT COMPLETE 与 SKIP
+
+- COMPLETE 仅适用于 RUNNING 的 COUNT + COMPLETE 当前轮次；用户确认整组完成，不伪造逐次计数。
+- 确认通过 `completeConfirmed` 表达，随后生成一条 COMPLETED 记录并复用现有调度提交推进。
+- COUNT + INCREMENT 和 TIMER 禁止调用 COMPLETE 确认。
+- SKIP 适用于当前 RUNNING 步骤的当前轮次，COUNT 和 TIMER 均可；只生成 SKIPPED 记录，不要求计数或计时完成。
+- 跳过只推进当前轮次；有剩余轮次进入下一轮，否则进入下一步骤/下一流程，最后轮次结束后会话正常 COMPLETED。
+- SKIPPED 不计入 completedCount，完成和跳过统计分别从 records 派生。
+- 两者均要求 expectedRevision，失败不改变 Session 或 revision。
+
 ## 校验
 
 - 步骤名称的首尾 Unicode 空白不具有业务意义：创建和编辑入口统一 trim；trim 后非空；内部空白保留；名称不得包含换行。

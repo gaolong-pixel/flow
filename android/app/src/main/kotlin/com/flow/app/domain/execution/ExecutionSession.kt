@@ -95,6 +95,45 @@ class ExecutionSession(
     }
 
     /**
+     * Atomically confirms the current COUNT + COMPLETE round.
+     *
+     * The completeConfirmed candidate is internal and never returned directly;
+     * only the final Session produced by [commitStepResult] is exposed.
+     */
+    internal fun confirmComplete(completion: StepRoundResult): ExecutionSession {
+        rejectTerminal()
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        if (completion.outcome != ExecutionStepOutcome.COMPLETED) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_RECORD)
+        }
+
+        val step = routineSnapshot.steps[progress.currentStepIndex]
+        if (step.type != StepType.COUNT || step.countMode != CountMode.COMPLETE) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_STATUS)
+        }
+        if (progress.completeConfirmed) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_COMPLETE_CONFIRMED)
+        }
+
+        val confirmed = copy(
+            progress = progress.copy(completeConfirmed = true)
+        )
+        return confirmed.commitStepResult(completion)
+    }
+
+    /**
+     * Atomically skips the current round for any step type.
+     */
+    internal fun skipCurrentRound(completion: StepRoundResult): ExecutionSession {
+        rejectTerminal()
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        if (completion.outcome != ExecutionStepOutcome.SKIPPED) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_RECORD)
+        }
+        return commitStepResult(completion)
+    }
+
+    /**
      * Low-level state operation for tests and internal model composition.
      * It appends a record without advancing progress and is not a scheduling
      * entry point. Normal execution must use [commitStepResult].

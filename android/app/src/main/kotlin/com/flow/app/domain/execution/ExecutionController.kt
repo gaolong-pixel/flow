@@ -25,7 +25,9 @@ enum class ExecutionControllerError {
     NOT_COUNT_STEP,
     COUNT_MODE_NOT_INCREMENT,
     COUNT_ALREADY_AT_TARGET,
-    INVALID_COUNT_STATE
+    INVALID_COUNT_STATE,
+    COUNT_MODE_NOT_COMPLETE,
+    COMPLETE_ALREADY_CONFIRMED
 }
 
 data class ExecutionControllerSnapshot(
@@ -48,6 +50,23 @@ sealed interface ExecutionControllerResult {
 sealed interface ExecutionControllerCreateResult {
     data class Success(val controller: ExecutionController) : ExecutionControllerCreateResult
     data class Failure(val error: ExecutionControllerError) : ExecutionControllerCreateResult
+}
+
+sealed interface StepActionResult {
+    data class Completed(
+        val session: ExecutionSession,
+        val revision: Long
+    ) : StepActionResult
+
+    data class Skipped(
+        val session: ExecutionSession,
+        val revision: Long
+    ) : StepActionResult
+
+    data class Failure(
+        val error: ExecutionControllerError,
+        val revision: Long
+    ) : StepActionResult
 }
 
 sealed interface CountIncrementResult {
@@ -209,6 +228,114 @@ class ExecutionController internal constructor(
         }
     }
 
+    fun confirmComplete(expectedRevision: Long): StepActionResult = synchronized(lock) {
+        if (expectedRevision != revisionValue) {
+            return stepFailure(ExecutionControllerError.STALE_OPERATION)
+        }
+        if (session.status == ExecutionStatus.COMPLETED ||
+            session.status == ExecutionStatus.CANCELLED
+        ) {
+            return stepFailure(ExecutionControllerError.TERMINAL_SESSION)
+        }
+        if (session.status != ExecutionStatus.RUNNING) {
+            return stepFailure(ExecutionControllerError.SESSION_NOT_RUNNING)
+        }
+
+        val step = session.routineSnapshot.steps[session.progress.currentStepIndex]
+        if (step.type != StepType.COUNT) {
+            return stepFailure(ExecutionControllerError.NOT_COUNT_STEP)
+        }
+        if (step.countMode != CountMode.COMPLETE) {
+            return stepFailure(ExecutionControllerError.COUNT_MODE_NOT_COMPLETE)
+        }
+        if (session.progress.completeConfirmed) {
+            return stepFailure(ExecutionControllerError.COMPLETE_ALREADY_CONFIRMED)
+        }
+        val roundStart = session.currentRoundStartedAt
+            ?: return stepFailure(ExecutionControllerError.INVALID_SESSION_STATE)
+        val now = clock.now()
+        if (now < 0L) {
+            return stepFailure(ExecutionControllerError.INVALID_TIMESTAMP)
+        }
+
+        val completion = StepRoundResult(
+            outcome = ExecutionStepOutcome.COMPLETED,
+            startedAt = roundStart,
+            endedAt = now
+        )
+        return try {
+            val next = session.confirmComplete(completion)
+            session = next
+            revisionValue += 1L
+            StepActionResult.Completed(session = next, revision = revisionValue)
+        } catch (error: ExecutionValidationException) {
+            stepFailure(
+                if (error.code == ExecutionValidationError.INVALID_TIMESTAMP) {
+                    ExecutionControllerError.INVALID_TIMESTAMP
+                } else {
+                    ExecutionControllerError.INVALID_SESSION_STATE
+                }
+            )
+        } catch (error: ExecutionSchedulingException) {
+            stepFailure(
+                if (error.code == SchedulingError.INVALID_RESULT_TIMESTAMP) {
+                    ExecutionControllerError.INVALID_TIMESTAMP
+                } else {
+                    ExecutionControllerError.INVALID_SESSION_STATE
+                }
+            )
+        }
+    }
+
+    fun skipCurrentRound(expectedRevision: Long): StepActionResult = synchronized(lock) {
+        if (expectedRevision != revisionValue) {
+            return stepFailure(ExecutionControllerError.STALE_OPERATION)
+        }
+        if (session.status == ExecutionStatus.COMPLETED ||
+            session.status == ExecutionStatus.CANCELLED
+        ) {
+            return stepFailure(ExecutionControllerError.TERMINAL_SESSION)
+        }
+        if (session.status != ExecutionStatus.RUNNING) {
+            return stepFailure(ExecutionControllerError.SESSION_NOT_RUNNING)
+        }
+
+        val roundStart = session.currentRoundStartedAt
+            ?: return stepFailure(ExecutionControllerError.INVALID_SESSION_STATE)
+        val now = clock.now()
+        if (now < 0L) {
+            return stepFailure(ExecutionControllerError.INVALID_TIMESTAMP)
+        }
+
+        val completion = StepRoundResult(
+            outcome = ExecutionStepOutcome.SKIPPED,
+            startedAt = roundStart,
+            endedAt = now
+        )
+        return try {
+            val next = session.skipCurrentRound(completion)
+            session = next
+            revisionValue += 1L
+            StepActionResult.Skipped(session = next, revision = revisionValue)
+        } catch (error: ExecutionValidationException) {
+            stepFailure(
+                if (error.code == ExecutionValidationError.INVALID_TIMESTAMP) {
+                    ExecutionControllerError.INVALID_TIMESTAMP
+                } else {
+                    ExecutionControllerError.INVALID_SESSION_STATE
+                }
+            )
+        } catch (error: ExecutionSchedulingException) {
+            stepFailure(
+                if (error.code == SchedulingError.INVALID_RESULT_TIMESTAMP) {
+                    ExecutionControllerError.INVALID_TIMESTAMP
+                } else {
+                    ExecutionControllerError.INVALID_SESSION_STATE
+                }
+            )
+        }
+    }
+
     fun pause(expectedRevision: Long): ExecutionControllerResult = synchronized(lock) {
         staleOrNull(expectedRevision)?.let { return it }
         terminalOrNull()?.let { return it }
@@ -294,6 +421,9 @@ class ExecutionController internal constructor(
 
     private fun countFailure(error: ExecutionControllerError): CountIncrementResult.Failure =
         CountIncrementResult.Failure(error = error, revision = revisionValue)
+
+    private fun stepFailure(error: ExecutionControllerError): StepActionResult.Failure =
+        StepActionResult.Failure(error = error, revision = revisionValue)
 
     companion object {
         fun create(

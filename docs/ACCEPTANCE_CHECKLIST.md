@@ -192,3 +192,15 @@
 - [ ] 暂停、取消、完成状态禁止计数
 - [ ] 非 COUNT 和 COUNT + COMPLETE 禁止调用 INCREMENT
 - [ ] 过期 revision、非法计数和提交失败不改变 Session 或 revision
+
+
+## COUNT COMPLETE 与 SKIP
+
+- [ ] COUNT + COMPLETE 确认生成一条 COMPLETED 记录并推进
+- [ ] COMPLETE 不修改 currentCount、不伪造逐次计数
+- [ ] COUNT + INCREMENT 和 TIMER 禁止调用 COMPLETE 确认
+- [ ] 重复确认和过期 revision 被拒绝
+- [ ] SKIP 支持 COUNT INCREMENT、COUNT COMPLETE 和 TIMER
+- [ ] SKIP 只跳过当前轮次并遵循步骤/流程重复顺序
+- [ ] SKIPPED 不计入 completedCount，skippedCount 正确增加
+- [ ] COMPLETE/SKIP 失败时 Session、records、progress、status、时间字段和 revision 不变
