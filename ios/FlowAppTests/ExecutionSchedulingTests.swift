@@ -458,17 +458,17 @@ final class ExecutionSchedulingTests: XCTestCase {
     }
 
     func testFinalTimerCompletionRetainsCurrentTimerState() throws {
-        let runningTimer = TimerState(
+        let completedTimer = TimerState(
             totalDurationMs: 30_000,
-            remainingDurationMs: 12_000,
-            deadline: 5_000,
-            timerStatus: .running
+            remainingDurationMs: 0,
+            deadline: nil,
+            timerStatus: .completed
         )
         let session = try runningSession(
             steps: [timerStep("t", "T", 30_000)],
             records: [],
             progress: progressForIndex(0, "t", 1),
-            timerState: runningTimer
+            timerState: completedTimer
         )
 
         let committed = try session.commitStepResult(
@@ -476,7 +476,7 @@ final class ExecutionSchedulingTests: XCTestCase {
         )
 
         XCTAssertEqual(committed.status, .completed)
-        XCTAssertEqual(committed.timerState, runningTimer)
+        XCTAssertEqual(committed.timerState, completedTimer)
         XCTAssertEqual(committed.completedAt, 1_500)
     }
 

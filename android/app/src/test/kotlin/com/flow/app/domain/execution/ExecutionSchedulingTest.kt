@@ -492,17 +492,17 @@ class ExecutionSchedulingTest {
 
     @Test
     fun finalTimerCompletionRetainsCurrentTimerState() {
-        val runningTimer = TimerState(
+        val completedTimer = TimerState(
             totalDurationMs = 30_000L,
-            remainingDurationMs = 12_000L,
-            deadline = 5_000L,
-            timerStatus = TimerStatus.RUNNING
+            remainingDurationMs = 0L,
+            deadline = null,
+            timerStatus = TimerStatus.COMPLETED
         )
         val session = runningSession(
             steps = listOf(timerStep("t", "T", 30_000L)),
             records = emptyList(),
             progress = progressForIndex(0, "t", 1),
-            timerState = runningTimer
+            timerState = completedTimer
         )
 
         val committed = session.commitStepResult(
@@ -510,7 +510,7 @@ class ExecutionSchedulingTest {
         )
 
         assertEquals(ExecutionStatus.COMPLETED, committed.status)
-        assertEquals(runningTimer, committed.timerState)
+        assertEquals(completedTimer, committed.timerState)
         assertEquals(1_500L, committed.completedAt)
     }
 

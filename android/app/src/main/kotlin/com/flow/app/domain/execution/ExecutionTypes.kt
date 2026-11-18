@@ -21,7 +21,8 @@ enum class TimerStatus {
     IDLE,
     RUNNING,
     PAUSED,
-    COMPLETED
+    COMPLETED,
+    CANCELLED
 }
 
 enum class ExecutionValidationError {

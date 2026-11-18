@@ -18,6 +18,7 @@ enum TimerStatus: String, Equatable {
     case running = "RUNNING"
     case paused = "PAUSED"
     case completed = "COMPLETED"
+    case cancelled = "CANCELLED"
 }
 
 enum ExecutionValidationError: Error, Equatable {

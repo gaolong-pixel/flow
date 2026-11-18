@@ -327,7 +327,8 @@ class ExecutionCountingTest {
         val result = ExecutionController.create(
             routine = routine,
             sessionId = "session-1",
-            clock = clock
+            clock = clock,
+            monotonicClock = ExecutionFakeMonotonicClock()
         )
         return (result as ExecutionControllerCreateResult.Success).controller
     }

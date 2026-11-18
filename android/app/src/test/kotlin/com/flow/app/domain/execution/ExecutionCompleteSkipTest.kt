@@ -390,7 +390,8 @@ class ExecutionCompleteSkipTest {
     ): ExecutionController = (ExecutionController.create(
         routine = routine,
         sessionId = "session-1",
-        clock = clock
+        clock = clock,
+        monotonicClock = ExecutionFakeMonotonicClock()
     ) as ExecutionControllerCreateResult.Success).controller
 
     private fun runningSession(

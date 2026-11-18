@@ -7,7 +7,7 @@ import com.flow.app.domain.model.StepType
 import java.util.Collections
 import java.util.UUID
 
-class ExecutionSession(
+class ExecutionSession internal constructor(
     val sessionId: String,
     val routineSnapshot: Routine,
     val status: ExecutionStatus,
@@ -33,7 +33,7 @@ class ExecutionSession(
         validate()
     }
 
-    fun start(at: Long): ExecutionSession {
+    internal fun start(at: Long): ExecutionSession {
         requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.READY)
         return copy(
             status = ExecutionStatus.RUNNING,
@@ -42,14 +42,119 @@ class ExecutionSession(
         )
     }
 
-    fun pause(): ExecutionSession {
+    internal fun pause(): ExecutionSession {
         requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        if (currentStepIsTimer() && timerState.timerStatus == TimerStatus.RUNNING) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
         return copy(status = ExecutionStatus.PAUSED)
     }
 
-    fun resume(): ExecutionSession {
+    internal fun resume(): ExecutionSession {
         requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.PAUSED)
+        if (currentStepIsTimer() && timerState.timerStatus == TimerStatus.PAUSED) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
         return copy(status = ExecutionStatus.RUNNING)
+    }
+
+    /**
+     * Starts the current TIMER without changing progress or records.
+     * Deadline is monotonic milliseconds, never Unix epoch milliseconds.
+     */
+    internal fun startTimer(deadlineMonotonicMs: Long): ExecutionSession {
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        requireCurrentTimer()
+        if (timerState.timerStatus != TimerStatus.IDLE || deadlineMonotonicMs <= 0L) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
+        return copy(
+            timerState = timerState.copy(
+                remainingDurationMs = timerState.totalDurationMs,
+                deadline = deadlineMonotonicMs,
+                timerStatus = TimerStatus.RUNNING
+            )
+        )
+    }
+
+    /**
+     * Pauses the current RUNNING TIMER and records its remaining duration.
+     */
+    internal fun pauseTimer(remainingDurationMs: Long): ExecutionSession {
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        requireCurrentTimer()
+        if (timerState.timerStatus != TimerStatus.RUNNING ||
+            remainingDurationMs <= 0L ||
+            remainingDurationMs > timerState.totalDurationMs
+        ) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
+        return copy(
+            status = ExecutionStatus.PAUSED,
+            timerState = timerState.copy(
+                remainingDurationMs = remainingDurationMs,
+                deadline = null,
+                timerStatus = TimerStatus.PAUSED
+            )
+        )
+    }
+
+    /**
+     * Resumes the current PAUSED TIMER using a new monotonic deadline.
+     */
+    internal fun resumeTimer(deadlineMonotonicMs: Long): ExecutionSession {
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.PAUSED)
+        requireCurrentTimer()
+        if (timerState.timerStatus != TimerStatus.PAUSED || deadlineMonotonicMs <= 0L) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
+        return copy(
+            status = ExecutionStatus.RUNNING,
+            timerState = timerState.copy(
+                deadline = deadlineMonotonicMs,
+                timerStatus = TimerStatus.RUNNING
+            )
+        )
+    }
+
+    /**
+     * Clears the active TIMER state to IDLE before committing a SKIPPED round.
+     * No timer completion is implied.
+     */
+    internal fun clearTimerForSkip(): ExecutionSession {
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        requireCurrentTimer()
+        if (timerState.timerStatus != TimerStatus.RUNNING &&
+            timerState.timerStatus != TimerStatus.PAUSED
+        ) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
+        return copy(
+            timerState = timerState.copy(
+                remainingDurationMs = timerState.totalDurationMs,
+                deadline = null,
+                timerStatus = TimerStatus.IDLE
+            )
+        )
+    }
+
+    /**
+     * Marks the current RUNNING TIMER completed without advancing the step.
+     * The caller must subsequently commit the round result through the Scheduler.
+     */
+    internal fun completeTimer(): ExecutionSession {
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+        requireCurrentTimer()
+        if (timerState.timerStatus != TimerStatus.RUNNING) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
+        return copy(
+            timerState = timerState.copy(
+                remainingDurationMs = 0L,
+                deadline = null,
+                timerStatus = TimerStatus.COMPLETED
+            )
+        )
     }
 
     /**
@@ -138,7 +243,7 @@ class ExecutionSession(
      * It appends a record without advancing progress and is not a scheduling
      * entry point. Normal execution must use [commitStepResult].
      */
-    fun appendRecord(record: ExecutionStepRecord): ExecutionSession {
+    internal fun appendRecord(record: ExecutionStepRecord): ExecutionSession {
         rejectTerminal()
         requireStatus(
             ExecutionValidationError.INVALID_STATUS,
@@ -151,10 +256,72 @@ class ExecutionSession(
         return copy(records = records + record)
     }
 
-    fun cancel(at: Long): ExecutionSession {
+    internal fun cancel(at: Long): ExecutionSession {
         rejectTerminal()
+        if (currentStepIsTimer() &&
+            (timerState.timerStatus == TimerStatus.RUNNING ||
+                timerState.timerStatus == TimerStatus.PAUSED)
+        ) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
         return copy(
             status = ExecutionStatus.CANCELLED,
+            cancelledAt = at,
+            currentRoundStartedAt = null
+        )
+    }
+
+    /**
+     * Cancels the session using a final TimerState already produced by the
+     * Controller/Timer cancellation path. Session never calls an Engine.
+     */
+    internal fun cancelWithTimerState(
+        at: Long,
+        timerState: TimerState
+    ): ExecutionSession {
+        rejectTerminal()
+        val step = routineSnapshot.steps[progress.currentStepIndex]
+        if (step.type == StepType.TIMER) {
+            when (this.timerState.timerStatus) {
+                TimerStatus.RUNNING,
+                TimerStatus.PAUSED -> {
+                    if (timerState.timerStatus != TimerStatus.CANCELLED &&
+                        timerState.timerStatus != TimerStatus.COMPLETED
+                    ) {
+                        throw ExecutionValidationException(
+                            ExecutionValidationError.INVALID_TIMER_STATE
+                        )
+                    }
+                }
+
+                TimerStatus.IDLE -> {
+                    if (timerState.timerStatus != TimerStatus.IDLE) {
+                        throw ExecutionValidationException(
+                            ExecutionValidationError.INVALID_TIMER_STATE
+                        )
+                    }
+                }
+
+                TimerStatus.COMPLETED -> {
+                    if (timerState.timerStatus != TimerStatus.COMPLETED) {
+                        throw ExecutionValidationException(
+                            ExecutionValidationError.INVALID_TIMER_STATE
+                        )
+                    }
+                }
+
+                TimerStatus.CANCELLED -> {
+                    if (timerState.timerStatus != TimerStatus.CANCELLED) {
+                        throw ExecutionValidationException(
+                            ExecutionValidationError.INVALID_TIMER_STATE
+                        )
+                    }
+                }
+            }
+        }
+        return copy(
+            status = ExecutionStatus.CANCELLED,
+            timerState = timerState,
             cancelledAt = at,
             currentRoundStartedAt = null
         )
@@ -164,7 +331,7 @@ class ExecutionSession(
      * Low-level terminal operation for tests and internal model composition.
      * Normal execution must transition through [commitStepResult].
      */
-    fun complete(at: Long): ExecutionSession {
+    internal fun complete(at: Long): ExecutionSession {
         rejectTerminal()
         requireStatus(
             ExecutionValidationError.INVALID_STATUS,
@@ -191,7 +358,7 @@ class ExecutionSession(
      * layer may call it; UI code must not construct StepRoundResult and submit
      * it directly.
      */
-    fun commitStepResult(result: StepRoundResult): ExecutionSession {
+    internal fun commitStepResult(result: StepRoundResult): ExecutionSession {
         val plan = ExecutionScheduler.planNext(this, result)
         val nextStatus = if (plan.kind == ScheduleKind.COMPLETE) {
             ExecutionStatus.COMPLETED
@@ -245,6 +412,16 @@ class ExecutionSession(
         cancelledAt = cancelledAt,
         currentRoundStartedAt = currentRoundStartedAt
     )
+
+    private fun currentStepIsTimer(): Boolean =
+        routineSnapshot.steps[progress.currentStepIndex].type == StepType.TIMER
+
+    private fun requireCurrentTimer() {
+        val step = routineSnapshot.steps[progress.currentStepIndex]
+        if (step.type != StepType.TIMER || timerState.totalDurationMs <= 0L) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_TIMER_STATE)
+        }
+    }
 
     private fun requireStatus(
         code: ExecutionValidationError,
@@ -346,6 +523,32 @@ class ExecutionSession(
         if (status == ExecutionStatus.READY && timer.timerStatus != TimerStatus.IDLE) {
             fail(ExecutionValidationError.INVALID_TIMER_STATE)
         }
+        when (status) {
+            ExecutionStatus.RUNNING -> {
+                if (timer.timerStatus == TimerStatus.PAUSED ||
+                    timer.timerStatus == TimerStatus.CANCELLED
+                ) {
+                    fail(ExecutionValidationError.INVALID_TIMER_STATE)
+                }
+            }
+
+            ExecutionStatus.PAUSED -> {
+                if (timer.timerStatus != TimerStatus.IDLE &&
+                    timer.timerStatus != TimerStatus.PAUSED
+                ) {
+                    fail(ExecutionValidationError.INVALID_TIMER_STATE)
+                }
+            }
+
+            ExecutionStatus.COMPLETED,
+            ExecutionStatus.CANCELLED -> {
+                if (timer.timerStatus == TimerStatus.RUNNING) {
+                    fail(ExecutionValidationError.INVALID_TIMER_STATE)
+                }
+            }
+
+            ExecutionStatus.READY -> Unit
+        }
 
         when (timer.timerStatus) {
             TimerStatus.IDLE -> {
@@ -373,6 +576,12 @@ class ExecutionSession(
 
             TimerStatus.COMPLETED -> {
                 if (timer.deadline != null || timer.remainingDurationMs != 0L) {
+                    fail(ExecutionValidationError.INVALID_TIMER_STATE)
+                }
+            }
+
+            TimerStatus.CANCELLED -> {
+                if (timer.deadline != null) {
                     fail(ExecutionValidationError.INVALID_TIMER_STATE)
                 }
             }
@@ -515,7 +724,7 @@ class ExecutionSession(
             stepIteration == other.stepIteration
 
     companion object {
-        fun create(
+        internal fun create(
             routine: Routine,
             sessionId: String = UUID.randomUUID().toString()
         ): ExecutionSession {

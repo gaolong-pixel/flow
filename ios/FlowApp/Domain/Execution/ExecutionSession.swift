@@ -60,12 +60,111 @@ struct ExecutionSession {
 
     func pause() throws -> ExecutionSession {
         try requireStatus(.running)
+        if currentStepIsTimer() && timerState.timerStatus == .running {
+            throw ExecutionValidationError.invalidTimerState
+        }
         return try copy(status: .paused)
     }
 
     func resume() throws -> ExecutionSession {
         try requireStatus(.paused)
+        if currentStepIsTimer() && timerState.timerStatus == .paused {
+            throw ExecutionValidationError.invalidTimerState
+        }
         return try copy(status: .running)
+    }
+
+    /// Starts the current TIMER without changing progress or records.
+    /// Deadline is monotonic milliseconds, never Unix epoch milliseconds.
+    func startTimer(deadlineMonotonicMs: Int64) throws -> ExecutionSession {
+        try requireStatus(.running)
+        try requireCurrentTimer()
+        guard timerState.timerStatus == .idle, deadlineMonotonicMs > 0 else {
+            throw ExecutionValidationError.invalidTimerState
+        }
+        return try copy(
+            timerState: TimerState(
+                totalDurationMs: timerState.totalDurationMs,
+                remainingDurationMs: timerState.totalDurationMs,
+                deadline: deadlineMonotonicMs,
+                timerStatus: .running
+            )
+        )
+    }
+
+    /// Pauses the current RUNNING TIMER and records its remaining duration.
+    func pauseTimer(remainingDurationMs: Int64) throws -> ExecutionSession {
+        try requireStatus(.running)
+        try requireCurrentTimer()
+        guard timerState.timerStatus == .running,
+              remainingDurationMs > 0,
+              remainingDurationMs <= timerState.totalDurationMs else {
+            throw ExecutionValidationError.invalidTimerState
+        }
+        return try copy(
+            status: .paused,
+            timerState: TimerState(
+                totalDurationMs: timerState.totalDurationMs,
+                remainingDurationMs: remainingDurationMs,
+                deadline: nil,
+                timerStatus: .paused
+            )
+        )
+    }
+
+    /// Resumes the current PAUSED TIMER using a new monotonic deadline.
+    func resumeTimer(deadlineMonotonicMs: Int64) throws -> ExecutionSession {
+        try requireStatus(.paused)
+        try requireCurrentTimer()
+        guard timerState.timerStatus == .paused, deadlineMonotonicMs > 0 else {
+            throw ExecutionValidationError.invalidTimerState
+        }
+        return try copy(
+            status: .running,
+            timerState: TimerState(
+                totalDurationMs: timerState.totalDurationMs,
+                remainingDurationMs: timerState.remainingDurationMs,
+                deadline: deadlineMonotonicMs,
+                timerStatus: .running
+            )
+        )
+    }
+
+    /// Clears the active TIMER state to IDLE before committing a SKIPPED round.
+    /// No timer completion is implied.
+    func clearTimerForSkip() throws -> ExecutionSession {
+        try requireStatus(.running)
+        try requireCurrentTimer()
+        guard timerState.timerStatus == .running ||
+            timerState.timerStatus == .paused else {
+            throw ExecutionValidationError.invalidTimerState
+        }
+        return try copy(
+            timerState: TimerState(
+                totalDurationMs: timerState.totalDurationMs,
+                remainingDurationMs: timerState.totalDurationMs,
+                deadline: nil,
+                timerStatus: .idle
+            )
+        )
+    }
+
+    /// Marks the current RUNNING TIMER completed without advancing the step.
+    /// The caller must subsequently commit the round result through the Scheduler.
+    func completeTimer() throws -> ExecutionSession {
+        try requireStatus(.running)
+        try requireCurrentTimer()
+        guard timerState.timerStatus == .running else {
+            throw ExecutionValidationError.invalidTimerState
+        }
+        return try copy(
+            timerState: TimerState(
+                totalDurationMs: timerState.totalDurationMs,
+                remainingDurationMs: 0,
+                deadline: nil,
+                timerStatus: .completed
+            )
+        )
     }
 
     /// Atomically increments the current COUNT/INCREMENT round.
@@ -178,8 +277,50 @@ struct ExecutionSession {
 
     func cancel(at: Int64) throws -> ExecutionSession {
         try rejectTerminal()
+        if currentStepIsTimer() &&
+            (timerState.timerStatus == .running || timerState.timerStatus == .paused)
+        {
+            throw ExecutionValidationError.invalidTimerState
+        }
         return try copy(
             status: .cancelled,
+            cancelledAt: at,
+            clearCurrentRound: true
+        )
+    }
+
+    /// Cancels the session using a final TimerState already produced by the
+    /// Controller/Timer cancellation path. Session never calls an Engine.
+    func cancelWithTimerState(
+        at: Int64,
+        timerState: TimerState
+    ) throws -> ExecutionSession {
+        try rejectTerminal()
+        let step = routineSnapshot.steps[progress.currentStepIndex]
+        if step.type == .timer {
+            switch self.timerState.timerStatus {
+            case .running, .paused:
+                guard timerState.timerStatus == .cancelled ||
+                    timerState.timerStatus == .completed else {
+                    throw ExecutionValidationError.invalidTimerState
+                }
+            case .idle:
+                guard timerState.timerStatus == .idle else {
+                    throw ExecutionValidationError.invalidTimerState
+                }
+            case .completed:
+                guard timerState.timerStatus == .completed else {
+                    throw ExecutionValidationError.invalidTimerState
+                }
+            case .cancelled:
+                guard timerState.timerStatus == .cancelled else {
+                    throw ExecutionValidationError.invalidTimerState
+                }
+            }
+        }
+        return try copy(
+            status: .cancelled,
+            timerState: timerState,
             cancelledAt: at,
             clearCurrentRound: true
         )
@@ -223,6 +364,17 @@ struct ExecutionSession {
             cancelledAt: cancelledAt ?? self.cancelledAt,
             currentRoundStartedAt: roundStart
         )
+    }
+
+    private func currentStepIsTimer() -> Bool {
+        routineSnapshot.steps[progress.currentStepIndex].type == .timer
+    }
+
+    private func requireCurrentTimer() throws {
+        let step = routineSnapshot.steps[progress.currentStepIndex]
+        guard step.type == .timer, timerState.totalDurationMs > 0 else {
+            throw ExecutionValidationError.invalidTimerState
+        }
     }
 
     private func requireStatus(_ allowed: ExecutionStatus...) throws {
@@ -313,6 +465,22 @@ struct ExecutionSession {
         if status == .ready && timer.timerStatus != .idle {
             throw ExecutionValidationError.invalidTimerState
         }
+        switch status {
+        case .running:
+            if timer.timerStatus == .paused || timer.timerStatus == .cancelled {
+                throw ExecutionValidationError.invalidTimerState
+            }
+        case .paused:
+            if timer.timerStatus != .idle && timer.timerStatus != .paused {
+                throw ExecutionValidationError.invalidTimerState
+            }
+        case .completed, .cancelled:
+            if timer.timerStatus == .running {
+                throw ExecutionValidationError.invalidTimerState
+            }
+        case .ready:
+            break
+        }
 
         switch timer.timerStatus {
         case .idle:
@@ -334,6 +502,10 @@ struct ExecutionSession {
             }
         case .completed:
             if timer.deadline != nil || timer.remainingDurationMs != 0 {
+                throw ExecutionValidationError.invalidTimerState
+            }
+        case .cancelled:
+            if timer.deadline != nil {
                 throw ExecutionValidationError.invalidTimerState
             }
         }
