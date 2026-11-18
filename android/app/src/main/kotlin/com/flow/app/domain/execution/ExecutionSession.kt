@@ -15,7 +15,8 @@ class ExecutionSession(
     records: List<ExecutionStepRecord>,
     val startedAt: Long? = null,
     val completedAt: Long? = null,
-    val cancelledAt: Long? = null
+    val cancelledAt: Long? = null,
+    val currentRoundStartedAt: Long? = null
 ) {
     val routineId: String = routineSnapshot.id
     val records: List<ExecutionStepRecord> =
@@ -33,7 +34,11 @@ class ExecutionSession(
 
     fun start(at: Long): ExecutionSession {
         requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.READY)
-        return copy(status = ExecutionStatus.RUNNING, startedAt = at)
+        return copy(
+            status = ExecutionStatus.RUNNING,
+            startedAt = at,
+            currentRoundStartedAt = at
+        )
     }
 
     fun pause(): ExecutionSession {
@@ -66,7 +71,11 @@ class ExecutionSession(
 
     fun cancel(at: Long): ExecutionSession {
         rejectTerminal()
-        return copy(status = ExecutionStatus.CANCELLED, cancelledAt = at)
+        return copy(
+            status = ExecutionStatus.CANCELLED,
+            cancelledAt = at,
+            currentRoundStartedAt = null
+        )
     }
 
     /**
@@ -80,7 +89,11 @@ class ExecutionSession(
             ExecutionStatus.RUNNING,
             ExecutionStatus.PAUSED
         )
-        return copy(status = ExecutionStatus.COMPLETED, completedAt = at)
+        return copy(
+            status = ExecutionStatus.COMPLETED,
+            completedAt = at,
+            currentRoundStartedAt = null
+        )
     }
 
     /**
@@ -120,7 +133,12 @@ class ExecutionSession(
             } else {
                 null
             },
-            cancelledAt = null
+            cancelledAt = null,
+            currentRoundStartedAt = if (plan.nextProgress != null) {
+                plan.record.endedAt
+            } else {
+                null
+            }
         )
     }
 
@@ -131,7 +149,8 @@ class ExecutionSession(
         records: List<ExecutionStepRecord> = this.records,
         startedAt: Long? = this.startedAt,
         completedAt: Long? = this.completedAt,
-        cancelledAt: Long? = this.cancelledAt
+        cancelledAt: Long? = this.cancelledAt,
+        currentRoundStartedAt: Long? = this.currentRoundStartedAt
     ): ExecutionSession = ExecutionSession(
         sessionId = sessionId,
         routineSnapshot = routineSnapshot,
@@ -141,7 +160,8 @@ class ExecutionSession(
         records = records,
         startedAt = startedAt,
         completedAt = completedAt,
-        cancelledAt = cancelledAt
+        cancelledAt = cancelledAt,
+        currentRoundStartedAt = currentRoundStartedAt
     )
 
     private fun requireStatus(
@@ -332,16 +352,27 @@ class ExecutionSession(
         if (cancelledAt != null && cancelledAt < 0L) {
             fail(ExecutionValidationError.INVALID_TIMESTAMP)
         }
+        if (currentRoundStartedAt != null && currentRoundStartedAt < 0L) {
+            fail(ExecutionValidationError.INVALID_TIMESTAMP)
+        }
 
         when (status) {
             ExecutionStatus.READY -> {
                 if (startedAt != null || completedAt != null || cancelledAt != null) {
                     fail(ExecutionValidationError.INVALID_TIMESTAMP)
                 }
+                if (currentRoundStartedAt != null) {
+                    fail(ExecutionValidationError.INVALID_TIMESTAMP)
+                }
             }
 
             ExecutionStatus.RUNNING, ExecutionStatus.PAUSED -> {
                 if (startedAt == null || completedAt != null || cancelledAt != null) {
+                    fail(ExecutionValidationError.INVALID_TIMESTAMP)
+                }
+                if (currentRoundStartedAt == null ||
+                    currentRoundStartedAt < startedAt
+                ) {
                     fail(ExecutionValidationError.INVALID_TIMESTAMP)
                 }
             }
@@ -353,6 +384,9 @@ class ExecutionSession(
                 if (completedAt < startedAt) {
                     fail(ExecutionValidationError.INVALID_TIMESTAMP)
                 }
+                if (currentRoundStartedAt != null) {
+                    fail(ExecutionValidationError.INVALID_TIMESTAMP)
+                }
             }
 
             ExecutionStatus.CANCELLED -> {
@@ -360,6 +394,9 @@ class ExecutionSession(
                     fail(ExecutionValidationError.INVALID_TIMESTAMP)
                 }
                 if (startedAt != null && cancelledAt < startedAt) {
+                    fail(ExecutionValidationError.INVALID_TIMESTAMP)
+                }
+                if (currentRoundStartedAt != null) {
                     fail(ExecutionValidationError.INVALID_TIMESTAMP)
                 }
             }

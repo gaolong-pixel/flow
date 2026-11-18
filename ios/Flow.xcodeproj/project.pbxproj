@@ -15,9 +15,11 @@
 		780A29047809E4BAAD9C0E22 /* RoutineDomainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */; };
 		7A314C9CFD4DE59A85527CEE /* ExecutionScheduling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */; };
 		84D0AAE24220F61A5F059A65 /* RoutineTextSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21088242D0EB8C895955431F /* RoutineTextSerializer.swift */; };
+		8C072BB5BF69BC90A6B1A127 /* ExecutionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */; };
 		8DF22295B6DA50FA04BA3B2A /* ExecutionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B70BDBF24A942F7CC01D038 /* ExecutionSession.swift */; };
 		9008BCC2E7AEE949C5AB2768 /* FlowEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */; };
 		902C341CD21122EA332D08A8 /* ParseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9478F4BE53A3F55848DA254 /* ParseModels.swift */; };
+		9F0D00D3EE2A7F79078B5C83 /* ExecutionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */; };
 		B8835920792E779AC3E0FA1B /* RoutineStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 762167171614C6A30DDABEE1 /* RoutineStep.swift */; };
 		BD2AFF41382ECADEE8D76B95 /* FlowRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */; };
 		C51E080F211AA0E3B59FA43E /* TextWhitespace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B74E97910E645A768901C8 /* TextWhitespace.swift */; };
@@ -62,9 +64,11 @@
 		95FA01D5BB9913A7EDB79665 /* FlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp.swift; sourceTree = "<group>"; };
 		9B70BDBF24A942F7CC01D038 /* ExecutionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionSession.swift; sourceTree = "<group>"; };
 		A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSerializerTests.swift; sourceTree = "<group>"; };
+		A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionControllerTests.swift; sourceTree = "<group>"; };
 		A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionScheduling.swift; sourceTree = "<group>"; };
 		B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowEditorModel.swift; sourceTree = "<group>"; };
 		C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineTextParser.swift; sourceTree = "<group>"; };
+		DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionController.swift; sourceTree = "<group>"; };
 		E8D296822B861C00CC436CE9 /* FlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorControllerTests.swift; sourceTree = "<group>"; };
 		F9478F4BE53A3F55848DA254 /* ParseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParseModels.swift; sourceTree = "<group>"; };
@@ -75,6 +79,7 @@
 			isa = PBXGroup;
 			children = (
 				F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */,
+				A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */,
 				722CA512C2F1BDC9CEC7CD54 /* ExecutionSchedulingTests.swift */,
 				7D2D4DA7BB72FD9C565D14C5 /* ExecutionSessionTests.swift */,
 				A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */,
@@ -125,6 +130,7 @@
 		BCA705AE1F9C1EA59A4D93E3 /* Execution */ = {
 			isa = PBXGroup;
 			children = (
+				DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */,
 				A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */,
 				9B70BDBF24A942F7CC01D038 /* ExecutionSession.swift */,
 				08AEE78D1AD9CD68FF37BEA2 /* ExecutionTypes.swift */,
@@ -248,6 +254,7 @@
 				D90E940DBAC88ABE8E1C1844 /* DomainTypes.swift in Sources */,
 				E44F88F79FFF20D5FF179064 /* EditorController.swift in Sources */,
 				E725B64EC8318DA24DFB7D3A /* EditorState.swift in Sources */,
+				9F0D00D3EE2A7F79078B5C83 /* ExecutionController.swift in Sources */,
 				7A314C9CFD4DE59A85527CEE /* ExecutionScheduling.swift in Sources */,
 				8DF22295B6DA50FA04BA3B2A /* ExecutionSession.swift in Sources */,
 				01A5F6163574ACAD738D4BF4 /* ExecutionTypes.swift in Sources */,
@@ -270,6 +277,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */,
+				8C072BB5BF69BC90A6B1A127 /* ExecutionControllerTests.swift in Sources */,
 				C77242796D95B76301842B30 /* ExecutionSchedulingTests.swift in Sources */,
 				46C02255071A0029715AC2D6 /* ExecutionSessionTests.swift in Sources */,
 				F69D315B54FA8DCD0C50CA41 /* ParserSerializerTests.swift in Sources */,

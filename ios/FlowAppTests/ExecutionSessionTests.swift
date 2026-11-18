@@ -39,6 +39,122 @@ final class ExecutionSessionTests: XCTestCase {
         XCTAssertEqual(session.timerState.timerStatus, .idle)
     }
 
+    func testReadySessionHasNoCurrentRoundStart() throws {
+        XCTAssertNil(try validSession().currentRoundStartedAt)
+    }
+
+    func testStartInitializesCurrentRoundStart() throws {
+        XCTAssertEqual(try startSession().currentRoundStartedAt, 1_000)
+    }
+
+    func testPauseAndResumePreserveCurrentRoundStart() throws {
+        let paused = try startSession().pause()
+        XCTAssertEqual(paused.currentRoundStartedAt, 1_000)
+        XCTAssertEqual(try paused.resume().currentRoundStartedAt, 1_000)
+    }
+
+    func testCancelClearsCurrentRoundStart() throws {
+        XCTAssertNil(try startSession().cancel(at: 2_000).currentRoundStartedAt)
+    }
+
+    func testCompletedClearsCurrentRoundStart() throws {
+        XCTAssertNil(try completedSession().currentRoundStartedAt)
+    }
+
+    func testRunningSessionRequiresCurrentRoundStart() throws {
+        let base = try validSession()
+        assertValidation(.invalidTimestamp) {
+            try invalidSession(
+                base,
+                status: .running,
+                startedAt: 1_000,
+                currentRoundStartedAt: nil
+            )
+        }
+    }
+
+    func testPausedSessionRequiresCurrentRoundStart() throws {
+        let base = try validSession()
+        assertValidation(.invalidTimestamp) {
+            try invalidSession(
+                base,
+                status: .paused,
+                startedAt: 1_000,
+                currentRoundStartedAt: nil
+            )
+        }
+    }
+
+    func testTerminalSessionRejectsCurrentRoundStart() throws {
+        assertValidation(.invalidTimestamp) {
+            try invalidSession(
+                try completedSession(),
+                currentRoundStartedAt: 1_000
+            )
+        }
+    }
+
+    func testRejectsCurrentRoundStartBeforeSessionStart() throws {
+        let base = try validSession()
+        assertValidation(.invalidTimestamp) {
+            try invalidSession(
+                base,
+                status: .running,
+                startedAt: 1_000,
+                currentRoundStartedAt: 999
+            )
+        }
+    }
+
+    func testCommitAdvancesCurrentRoundStartToEndedAt() throws {
+        let session = try ExecutionSession.create(
+            routine: makeRoutine(
+                steps: [countStep("a", "A", 1, repeatCount: 2)]
+            )
+        ).start(at: 1_000)
+
+        let committed = try session.commitStepResult(
+            StepRoundResult(
+                outcome: .completed,
+                startedAt: 1_000,
+                endedAt: 1_500
+            )
+        )
+
+        XCTAssertEqual(committed.currentRoundStartedAt, 1_500)
+        XCTAssertEqual(committed.progress.stepIteration, 2)
+    }
+
+    func testCommitFinalClearsCurrentRoundStart() throws {
+        let committed = try startSession().commitStepResult(
+            StepRoundResult(
+                outcome: .completed,
+                startedAt: 1_000,
+                endedAt: 1_500
+            )
+        )
+
+        XCTAssertNil(committed.currentRoundStartedAt)
+        XCTAssertEqual(committed.status, .completed)
+    }
+
+    func testFailedCommitKeepsCurrentRoundStart() throws {
+        let session = try startSession()
+        do {
+            _ = try session.commitStepResult(
+                StepRoundResult(
+                    outcome: .completed,
+                    startedAt: 999,
+                    endedAt: 1_500
+                )
+            )
+            XCTFail("Expected scheduling failure")
+        } catch let error as SchedulingError {
+            XCTAssertEqual(error, .invalidResultTimestamp)
+        }
+        XCTAssertEqual(session.currentRoundStartedAt, 1_000)
+    }
+
     func testRejectsEmptyRoutine() {
         assertValidation(.emptySteps) {
             try ExecutionSession.create(routine: makeRoutine(steps: []))
@@ -335,6 +451,19 @@ final class ExecutionSessionTests: XCTestCase {
         }
     }
 
+    private func completedSession() throws -> ExecutionSession {
+        let running = try startSession()
+        let record = ExecutionStepRecord(
+            stepID: "a",
+            routineIteration: 1,
+            stepIteration: 1,
+            outcome: .completed,
+            startedAt: 1_000,
+            endedAt: 1_500
+        )
+        return try running.appendRecord(record).complete(at: 2_000)
+    }
+
     private func startSession() throws -> ExecutionSession {
         try ExecutionSession.create(
             routine: makeRoutine(steps: [countStep("a", "A", 2)])
@@ -361,7 +490,8 @@ final class ExecutionSessionTests: XCTestCase {
         records: [ExecutionStepRecord]? = nil,
         startedAt: Int64? = nil,
         completedAt: Int64? = nil,
-        cancelledAt: Int64? = nil
+        cancelledAt: Int64? = nil,
+        currentRoundStartedAt: Int64? = nil
     ) throws -> ExecutionSession {
         try ExecutionSession(
             sessionID: base.sessionID,
@@ -372,7 +502,8 @@ final class ExecutionSessionTests: XCTestCase {
             records: records ?? base.records,
             startedAt: startedAt ?? base.startedAt,
             completedAt: completedAt ?? base.completedAt,
-            cancelledAt: cancelledAt ?? base.cancelledAt
+            cancelledAt: cancelledAt ?? base.cancelledAt,
+            currentRoundStartedAt: currentRoundStartedAt ?? base.currentRoundStartedAt
         )
     }
 

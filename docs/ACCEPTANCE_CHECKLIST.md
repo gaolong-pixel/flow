@@ -167,3 +167,17 @@
 - [ ] 步骤 ID、顺序、countMode、category、repeatCount 均持久化
 - [ ] 流程级 repeatCount 与步骤级 repeatCount 分列保存
 - [ ] 后续执行快照与模板修改隔离
+
+
+## 执行控制器
+
+- [ ] ExecutionSession 的 currentRoundStartedAt 生命周期符合 READY/RUNNING/PAUSED/COMPLETED/CANCELLED 规则
+- [ ] start 初始化当前轮次开始时间
+- [ ] pause/resume 保留当前轮次开始时间
+- [ ] cancel/最终完成清空当前轮次开始时间
+- [ ] 执行控制器空流程不创建 READY 会话
+- [ ] 控制器 revision 成功操作递增、失败和查询不递增
+- [ ] stale expectedRevision 被拒绝且不修改状态
+- [ ] 本轮结果时间早于 currentRoundStartedAt 时被拒绝且不修改状态
+- [ ] 时钟倒退时取消操作被拒绝且 revision 不变
+- [ ] 控制器生命周期双端语义一致

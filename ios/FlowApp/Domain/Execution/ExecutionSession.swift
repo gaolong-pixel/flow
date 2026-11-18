@@ -10,6 +10,7 @@ struct ExecutionSession {
     let startedAt: Int64?
     let completedAt: Int64?
     let cancelledAt: Int64?
+    let currentRoundStartedAt: Int64?
 
     var routineID: String {
         routineSnapshot.id
@@ -32,7 +33,8 @@ struct ExecutionSession {
         records: [ExecutionStepRecord],
         startedAt: Int64? = nil,
         completedAt: Int64? = nil,
-        cancelledAt: Int64? = nil
+        cancelledAt: Int64? = nil,
+        currentRoundStartedAt: Int64? = nil
     ) throws {
         self.sessionID = sessionID
         self.routineSnapshot = routineSnapshot
@@ -43,12 +45,17 @@ struct ExecutionSession {
         self.startedAt = startedAt
         self.completedAt = completedAt
         self.cancelledAt = cancelledAt
+        self.currentRoundStartedAt = currentRoundStartedAt
         try validate()
     }
 
     func start(at: Int64) throws -> ExecutionSession {
         try requireStatus(.ready)
-        return try copy(status: .running, startedAt: at)
+        return try copy(
+            status: .running,
+            startedAt: at,
+            currentRoundStartedAt: at
+        )
     }
 
     func pause() throws -> ExecutionSession {
@@ -75,7 +82,11 @@ struct ExecutionSession {
 
     func cancel(at: Int64) throws -> ExecutionSession {
         try rejectTerminal()
-        return try copy(status: .cancelled, cancelledAt: at)
+        return try copy(
+            status: .cancelled,
+            cancelledAt: at,
+            clearCurrentRound: true
+        )
     }
 
     /// Low-level terminal operation for tests and internal model composition.
@@ -83,7 +94,11 @@ struct ExecutionSession {
     func complete(at: Int64) throws -> ExecutionSession {
         try rejectTerminal()
         try requireStatus(.running, .paused)
-        return try copy(status: .completed, completedAt: at)
+        return try copy(
+            status: .completed,
+            completedAt: at,
+            clearCurrentRound: true
+        )
     }
 
     private func copy(
@@ -93,9 +108,14 @@ struct ExecutionSession {
         records: [ExecutionStepRecord]? = nil,
         startedAt: Int64? = nil,
         completedAt: Int64? = nil,
-        cancelledAt: Int64? = nil
+        cancelledAt: Int64? = nil,
+        currentRoundStartedAt: Int64? = nil,
+        clearCurrentRound: Bool = false
     ) throws -> ExecutionSession {
-        try ExecutionSession(
+        let roundStart = clearCurrentRound
+            ? nil
+            : (currentRoundStartedAt ?? self.currentRoundStartedAt)
+        return try ExecutionSession(
             sessionID: sessionID,
             routineSnapshot: routineSnapshot,
             status: status ?? self.status,
@@ -104,7 +124,8 @@ struct ExecutionSession {
             records: records ?? self.records,
             startedAt: startedAt ?? self.startedAt,
             completedAt: completedAt ?? self.completedAt,
-            cancelledAt: cancelledAt ?? self.cancelledAt
+            cancelledAt: cancelledAt ?? self.cancelledAt,
+            currentRoundStartedAt: roundStart
         )
     }
 
@@ -277,28 +298,41 @@ struct ExecutionSession {
         if let cancelledAt = cancelledAt, cancelledAt < 0 {
             throw ExecutionValidationError.invalidTimestamp
         }
+        if let currentRoundStartedAt = currentRoundStartedAt, currentRoundStartedAt < 0 {
+            throw ExecutionValidationError.invalidTimestamp
+        }
 
         switch status {
         case .ready:
             if startedAt != nil || completedAt != nil || cancelledAt != nil {
                 throw ExecutionValidationError.invalidTimestamp
             }
+            if currentRoundStartedAt != nil {
+                throw ExecutionValidationError.invalidTimestamp
+            }
         case .running, .paused:
-            if startedAt == nil || completedAt != nil || cancelledAt != nil {
+            guard let startedAt, let currentRoundStartedAt else {
+                throw ExecutionValidationError.invalidTimestamp
+            }
+            if completedAt != nil || cancelledAt != nil ||
+                currentRoundStartedAt < startedAt
+            {
                 throw ExecutionValidationError.invalidTimestamp
             }
         case .completed:
             guard let startedAt, let completedAt else {
                 throw ExecutionValidationError.invalidTimestamp
             }
-            if cancelledAt != nil || completedAt < startedAt {
+            if cancelledAt != nil || completedAt < startedAt ||
+                currentRoundStartedAt != nil
+            {
                 throw ExecutionValidationError.invalidTimestamp
             }
         case .cancelled:
             guard let cancelledAt else {
                 throw ExecutionValidationError.invalidTimestamp
             }
-            if completedAt != nil {
+            if completedAt != nil || currentRoundStartedAt != nil {
                 throw ExecutionValidationError.invalidTimestamp
             }
             if let startedAt, cancelledAt < startedAt {
@@ -415,6 +449,7 @@ extension ExecutionSession {
             initialTimerStateForStep(routineSnapshot.steps[$0.currentStepIndex])
         } ?? timerState
         let completedAt = plan.kind == .complete ? plan.record.endedAt : nil
+        let currentRoundStartedAt = plan.nextProgress != nil ? plan.record.endedAt : nil
         return try ExecutionSession(
             sessionID: sessionID,
             routineSnapshot: routineSnapshot,
@@ -424,7 +459,8 @@ extension ExecutionSession {
             records: records + [plan.record],
             startedAt: startedAt,
             completedAt: completedAt,
-            cancelledAt: nil
+            cancelledAt: nil,
+            currentRoundStartedAt: currentRoundStartedAt
         )
     }
 }

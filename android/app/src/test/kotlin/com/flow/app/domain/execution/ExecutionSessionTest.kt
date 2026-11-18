@@ -55,6 +55,119 @@ class ExecutionSessionTest {
     }
 
     @Test
+    fun readySessionHasNoCurrentRoundStart() {
+        val session = validSession()
+        assertEquals(null, session.currentRoundStartedAt)
+    }
+
+    @Test
+    fun startInitializesCurrentRoundStart() {
+        val session = startSession()
+        assertEquals(1_000L, session.currentRoundStartedAt)
+    }
+
+    @Test
+    fun pauseAndResumePreserveCurrentRoundStart() {
+        val paused = startSession().pause()
+        assertEquals(1_000L, paused.currentRoundStartedAt)
+        val resumed = paused.resume()
+        assertEquals(1_000L, resumed.currentRoundStartedAt)
+    }
+
+    @Test
+    fun cancelClearsCurrentRoundStart() {
+        val cancelled = startSession().cancel(2_000L)
+        assertEquals(null, cancelled.currentRoundStartedAt)
+    }
+
+    @Test
+    fun completedClearsCurrentRoundStart() {
+        assertEquals(null, completedSession().currentRoundStartedAt)
+    }
+
+    @Test
+    fun runningSessionRequiresCurrentRoundStart() {
+        val base = validSession()
+        assertValidation(ExecutionValidationError.INVALID_TIMESTAMP) {
+            invalidSession(
+                base,
+                status = ExecutionStatus.RUNNING,
+                startedAt = 1_000L,
+                currentRoundStartedAt = null
+            )
+        }
+    }
+
+    @Test
+    fun pausedSessionRequiresCurrentRoundStart() {
+        val base = validSession()
+        assertValidation(ExecutionValidationError.INVALID_TIMESTAMP) {
+            invalidSession(
+                base,
+                status = ExecutionStatus.PAUSED,
+                startedAt = 1_000L,
+                currentRoundStartedAt = null
+            )
+        }
+    }
+
+    @Test
+    fun terminalSessionRejectsCurrentRoundStart() {
+        assertValidation(ExecutionValidationError.INVALID_TIMESTAMP) {
+            invalidSession(completedSession(), currentRoundStartedAt = 1_000L)
+        }
+    }
+
+    @Test
+    fun rejectsCurrentRoundStartBeforeSessionStart() {
+        val base = validSession()
+        assertValidation(ExecutionValidationError.INVALID_TIMESTAMP) {
+            invalidSession(
+                base,
+                status = ExecutionStatus.RUNNING,
+                startedAt = 1_000L,
+                currentRoundStartedAt = 999L
+            )
+        }
+    }
+
+    @Test
+    fun commitAdvancesCurrentRoundStartToEndedAt() {
+        val session = ExecutionSession.create(
+            routine = routine(steps = listOf(countStep("a", "A", 1, repeatCount = 2)))
+        ).start(1_000L)
+
+        val committed = session.commitStepResult(
+            StepRoundResult(ExecutionStepOutcome.COMPLETED, 1_000L, 1_500L)
+        )
+
+        assertEquals(1_500L, committed.currentRoundStartedAt)
+        assertEquals(2, committed.progress.stepIteration)
+    }
+
+    @Test
+    fun commitFinalClearsCurrentRoundStart() {
+        val committed = startSession().commitStepResult(
+            StepRoundResult(ExecutionStepOutcome.COMPLETED, 1_000L, 1_500L)
+        )
+
+        assertEquals(null, committed.currentRoundStartedAt)
+        assertEquals(ExecutionStatus.COMPLETED, committed.status)
+    }
+
+    @Test
+    fun failedCommitKeepsCurrentRoundStart() {
+        val session = startSession()
+        val error = assertThrows(ExecutionSchedulingException::class.java) {
+            session.commitStepResult(
+                StepRoundResult(ExecutionStepOutcome.COMPLETED, 999L, 1_500L)
+            )
+        }
+        assertEquals(SchedulingError.INVALID_RESULT_TIMESTAMP, error.code)
+        assertEquals(1_000L, session.currentRoundStartedAt)
+    }
+
+    @Test
     fun rejectsEmptyRoutine() {
         assertValidation(ExecutionValidationError.EMPTY_STEPS) {
             ExecutionSession.create(routine(steps = emptyList()))
@@ -349,6 +462,19 @@ class ExecutionSessionTest {
         }
     }
 
+    private fun completedSession(): ExecutionSession {
+        val running = startSession()
+        val record = ExecutionStepRecord(
+            stepId = "a",
+            routineIteration = 1,
+            stepIteration = 1,
+            outcome = ExecutionStepOutcome.COMPLETED,
+            startedAt = 1_000L,
+            endedAt = 1_500L
+        )
+        return running.appendRecord(record).complete(2_000L)
+    }
+
     private fun startSession(): ExecutionSession =
         ExecutionSession.create(routine(steps = listOf(countStep("a", "A", 2))))
             .start(1_000L)
@@ -369,7 +495,8 @@ class ExecutionSessionTest {
         records: List<ExecutionStepRecord> = base.records,
         startedAt: Long? = base.startedAt,
         completedAt: Long? = base.completedAt,
-        cancelledAt: Long? = base.cancelledAt
+        cancelledAt: Long? = base.cancelledAt,
+        currentRoundStartedAt: Long? = base.currentRoundStartedAt
     ): ExecutionSession = ExecutionSession(
         sessionId = base.sessionId,
         routineSnapshot = base.routineSnapshot,
@@ -379,7 +506,8 @@ class ExecutionSessionTest {
         records = records,
         startedAt = startedAt,
         completedAt = completedAt,
-        cancelledAt = cancelledAt
+        cancelledAt = cancelledAt,
+        currentRoundStartedAt = currentRoundStartedAt
     )
 
     private fun assertValidation(

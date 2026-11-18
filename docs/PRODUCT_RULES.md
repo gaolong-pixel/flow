@@ -77,6 +77,16 @@
 - 空草稿、仅空行文本是合法状态；卡片模式显示空状态。
 - 卡片操作或序列化失败时，`EditorController` 返回独立错误码，Draft、文本、快照和模式保持不变。
 
+## 执行控制器与轮次时间
+
+- `ExecutionSession.currentRoundStartedAt` 是当前步骤轮次的开始时间，单位为 Unix epoch 毫秒。
+- READY、COMPLETED、CANCELLED 下该字段为空；RUNNING、PAUSED 下必须非空且不早于会话 `startedAt`。
+- 暂停和继续保留当前轮次开始时间；取消和最终完成清空该字段。
+- 步骤完成或跳过并推进时，下一轮开始时间取本轮记录的 `endedAt`；全部完成时清空。
+- 提交本轮结果时，`startedAt` 和 `endedAt` 都不得早于当前 `currentRoundStartedAt`；非法时间不得推进会话。
+- `ExecutionStepRecord.startedAt`/`endedAt` 表示当前轮次的实际时间跨度，暂停时间包含在跨度内；本阶段不统计有效运动时长。
+- `ExecutionController.revision` 是控制器操作版本，不属于 ExecutionSession。成功状态变化递增一次；失败和查询不递增；修改操作必须携带 `expectedRevision`。
+
 ## 校验
 
 - 步骤名称的首尾 Unicode 空白不具有业务意义：创建和编辑入口统一 trim；trim 后非空；内部空白保留；名称不得包含换行。

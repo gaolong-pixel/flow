@@ -14,6 +14,7 @@ enum SchedulingError: Error, Equatable {
     case progressMismatch
     case noRemainingIterations
     case invalidResultTimestamp
+    case invalidSessionState
 }
 
 /// Result of the current round supplied by the verified execution control layer.
@@ -98,7 +99,14 @@ enum ExecutionScheduler {
         guard let sessionStart = session.startedAt else {
             throw SchedulingError.sessionNotRunning
         }
-        if result.startedAt < sessionStart || result.endedAt < result.startedAt {
+        guard let currentRoundStart = session.currentRoundStartedAt else {
+            throw SchedulingError.invalidSessionState
+        }
+        if result.startedAt < sessionStart ||
+            result.endedAt < result.startedAt ||
+            result.startedAt < currentRoundStart ||
+            result.endedAt < currentRoundStart
+        {
             throw SchedulingError.invalidResultTimestamp
         }
 

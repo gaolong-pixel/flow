@@ -15,7 +15,8 @@ enum class SchedulingError {
     CURRENT_ROUND_ALREADY_RECORDED,
     PROGRESS_MISMATCH,
     NO_REMAINING_ITERATIONS,
-    INVALID_RESULT_TIMESTAMP
+    INVALID_RESULT_TIMESTAMP,
+    INVALID_SESSION_STATE
 }
 
 class ExecutionSchedulingException(
@@ -98,7 +99,13 @@ object ExecutionScheduler {
 
         val sessionStart = session.startedAt
             ?: fail(SchedulingError.SESSION_NOT_RUNNING)
-        if (result.startedAt < sessionStart || result.endedAt < result.startedAt) {
+        val currentRoundStart = session.currentRoundStartedAt
+            ?: fail(SchedulingError.INVALID_SESSION_STATE)
+        if (result.startedAt < sessionStart ||
+            result.endedAt < result.startedAt ||
+            result.startedAt < currentRoundStart ||
+            result.endedAt < currentRoundStart
+        ) {
             fail(SchedulingError.INVALID_RESULT_TIMESTAMP)
         }
 

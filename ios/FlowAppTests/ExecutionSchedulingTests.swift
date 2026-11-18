@@ -245,7 +245,8 @@ final class ExecutionSchedulingTests: XCTestCase {
                 timerStatus: .idle
             ),
             records: [record("a", 1, 1)],
-            startedAt: 1_000
+            startedAt: 1_000,
+            currentRoundStartedAt: 1_000
         )
 
         assertSchedulingError(.progressMismatch) {
@@ -479,6 +480,94 @@ final class ExecutionSchedulingTests: XCTestCase {
         XCTAssertEqual(committed.completedAt, 1_500)
     }
 
+    func testRejectsResultStartingBeforeCurrentRoundStart() throws {
+        let session = try runningSession(
+            steps: [countStep("a", "A", 1)],
+            records: [],
+            progress: progressForIndex(0, "a", 1),
+            currentRoundStartedAt: 2_000
+        )
+
+        assertSchedulingError(.invalidResultTimestamp) {
+            try planNext(
+                session,
+                result: stepResult(.completed, 1_000, 1_500)
+            )
+        }
+    }
+
+    func testRejectsResultEndingBeforeCurrentRoundStart() throws {
+        let session = try runningSession(
+            steps: [countStep("a", "A", 1)],
+            records: [],
+            progress: progressForIndex(0, "a", 1),
+            currentRoundStartedAt: 2_000
+        )
+
+        assertSchedulingError(.invalidResultTimestamp) {
+            try planNext(
+                session,
+                result: stepResult(.completed, 1_500, 1_900)
+            )
+        }
+    }
+
+    func testAcceptsResultStartingAtCurrentRoundStart() throws {
+        let session = try runningSession(
+            steps: [countStep("a", "A", 1)],
+            records: [],
+            progress: progressForIndex(0, "a", 1),
+            currentRoundStartedAt: 2_000
+        )
+
+        let plan = try planNext(
+            session,
+            result: stepResult(.completed, 2_000, 2_500)
+        )
+
+        XCTAssertEqual(plan.kind, .complete)
+    }
+
+    func testAcceptsResultEndingAtCurrentRoundStartWithZeroDuration() throws {
+        let session = try runningSession(
+            steps: [countStep("a", "A", 1)],
+            records: [],
+            progress: progressForIndex(0, "a", 1),
+            currentRoundStartedAt: 2_000
+        )
+
+        let plan = try planNext(
+            session,
+            result: stepResult(.completed, 2_000, 2_000)
+        )
+
+        XCTAssertEqual(plan.kind, .complete)
+    }
+
+    func testFailedRoundStartTimeCommitKeepsSessionUnchanged() throws {
+        let session = try runningSession(
+            steps: [countStep("a", "A", 1)],
+            records: [],
+            progress: progressForIndex(0, "a", 1),
+            currentRoundStartedAt: 2_000
+        )
+        let beforeProgress = session.progress
+        let beforeRecords = session.records
+        let beforeStatus = session.status
+        let beforeRoundStart = session.currentRoundStartedAt
+
+        assertSchedulingError(.invalidResultTimestamp) {
+            try session.commitStepResult(
+                stepResult(.completed, 1_000, 1_500)
+            )
+        }
+
+        XCTAssertEqual(session.progress, beforeProgress)
+        XCTAssertEqual(session.records, beforeRecords)
+        XCTAssertEqual(session.status, beforeStatus)
+        XCTAssertEqual(session.currentRoundStartedAt, beforeRoundStart)
+    }
+
     func testFailedCommitDoesNotChangeOriginalSession() throws {
         let session = try startedSession(steps: [countStep("a", "A", 1)])
         let beforeProgress = session.progress
@@ -509,7 +598,8 @@ final class ExecutionSchedulingTests: XCTestCase {
         repeatCount: Int = 1,
         records: [ExecutionStepRecord],
         progress: ExecutionProgress,
-        timerState: TimerState? = nil
+        timerState: TimerState? = nil,
+        currentRoundStartedAt: Int64 = 1_000
     ) throws -> ExecutionSession {
         try ExecutionSession(
             sessionID: "session-1",
@@ -518,7 +608,8 @@ final class ExecutionSchedulingTests: XCTestCase {
             progress: progress,
             timerState: timerState ?? timerStateFor(steps[progress.currentStepIndex]),
             records: records,
-            startedAt: 1_000
+            startedAt: 1_000,
+            currentRoundStartedAt: currentRoundStartedAt
         )
     }
 

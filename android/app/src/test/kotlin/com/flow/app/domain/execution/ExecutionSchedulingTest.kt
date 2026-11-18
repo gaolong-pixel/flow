@@ -257,7 +257,8 @@ class ExecutionSchedulingTest {
             progress = progressForIndex(0, "a", 3),
             timerState = TimerState(0L, 0L, null, TimerStatus.IDLE),
             records = listOf(record("a", 1, 1)),
-            startedAt = 1_000L
+            startedAt = 1_000L,
+            currentRoundStartedAt = 1_000L
         )
 
         assertSchedulingError(SchedulingError.PROGRESS_MISMATCH) {
@@ -514,6 +515,93 @@ class ExecutionSchedulingTest {
     }
 
     @Test
+    fun rejectsResultStartingBeforeCurrentRoundStart() {
+        val session = runningSession(
+            steps = listOf(countStep("a", "A", 1)),
+            records = emptyList(),
+            progress = progressForIndex(0, "a", 1),
+            currentRoundStartedAt = 2_000L
+        )
+
+        assertSchedulingError(SchedulingError.INVALID_RESULT_TIMESTAMP) {
+            planNext(session, result(ExecutionStepOutcome.COMPLETED, 1_000L, 1_500L))
+        }
+    }
+
+    @Test
+    fun rejectsResultEndingBeforeCurrentRoundStart() {
+        val session = runningSession(
+            steps = listOf(countStep("a", "A", 1)),
+            records = emptyList(),
+            progress = progressForIndex(0, "a", 1),
+            currentRoundStartedAt = 2_000L
+        )
+
+        assertSchedulingError(SchedulingError.INVALID_RESULT_TIMESTAMP) {
+            planNext(session, result(ExecutionStepOutcome.COMPLETED, 1_500L, 1_900L))
+        }
+    }
+
+    @Test
+    fun acceptsResultStartingAtCurrentRoundStart() {
+        val session = runningSession(
+            steps = listOf(countStep("a", "A", 1)),
+            records = emptyList(),
+            progress = progressForIndex(0, "a", 1),
+            currentRoundStartedAt = 2_000L
+        )
+
+        val plan = planNext(
+            session,
+            result(ExecutionStepOutcome.COMPLETED, 2_000L, 2_500L)
+        )
+
+        assertEquals(ScheduleKind.COMPLETE, plan.kind)
+    }
+
+    @Test
+    fun acceptsResultEndingAtCurrentRoundStartWithZeroDuration() {
+        val session = runningSession(
+            steps = listOf(countStep("a", "A", 1)),
+            records = emptyList(),
+            progress = progressForIndex(0, "a", 1),
+            currentRoundStartedAt = 2_000L
+        )
+
+        val plan = planNext(
+            session,
+            result(ExecutionStepOutcome.COMPLETED, 2_000L, 2_000L)
+        )
+
+        assertEquals(ScheduleKind.COMPLETE, plan.kind)
+    }
+
+    @Test
+    fun failedRoundStartTimeCommitKeepsSessionUnchanged() {
+        val session = runningSession(
+            steps = listOf(countStep("a", "A", 1)),
+            records = emptyList(),
+            progress = progressForIndex(0, "a", 1),
+            currentRoundStartedAt = 2_000L
+        )
+        val beforeProgress = session.progress
+        val beforeRecords = session.records
+        val beforeStatus = session.status
+        val beforeRoundStart = session.currentRoundStartedAt
+
+        assertSchedulingError(SchedulingError.INVALID_RESULT_TIMESTAMP) {
+            session.commitStepResult(
+                result(ExecutionStepOutcome.COMPLETED, 1_000L, 1_500L)
+            )
+        }
+
+        assertEquals(beforeProgress, session.progress)
+        assertEquals(beforeRecords, session.records)
+        assertEquals(beforeStatus, session.status)
+        assertEquals(beforeRoundStart, session.currentRoundStartedAt)
+    }
+
+    @Test
     fun failedCommitDoesNotChangeOriginalSession() {
         val session = startedSession(
             steps = listOf(countStep("a", "A", 1))
@@ -547,7 +635,8 @@ class ExecutionSchedulingTest {
         repeatCount: Int = 1,
         records: List<ExecutionStepRecord>,
         progress: ExecutionProgress,
-        timerState: TimerState? = null
+        timerState: TimerState? = null,
+        currentRoundStartedAt: Long = 1_000L
     ): ExecutionSession = ExecutionSession(
         sessionId = "session-1",
         routineSnapshot = routine(steps = steps, repeatCount = repeatCount),
@@ -555,7 +644,8 @@ class ExecutionSchedulingTest {
         progress = progress,
         timerState = timerState ?: timerStateFor(steps[progress.currentStepIndex]),
         records = records,
-        startedAt = 1_000L
+        startedAt = 1_000L,
+        currentRoundStartedAt = currentRoundStartedAt
     )
 
     private fun progressForIndex(
