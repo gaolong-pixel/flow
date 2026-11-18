@@ -61,6 +61,9 @@ struct ExecutionSession {
         return try copy(status: .running)
     }
 
+    /// Low-level state operation for tests and internal model composition.
+    /// It appends a record without advancing progress and is not a scheduling
+    /// entry point. Normal execution must use `commitStepResult`.
     func appendRecord(_ record: ExecutionStepRecord) throws -> ExecutionSession {
         try rejectTerminal()
         try requireStatus(.running, .paused)
@@ -75,6 +78,8 @@ struct ExecutionSession {
         return try copy(status: .cancelled, cancelledAt: at)
     }
 
+    /// Low-level terminal operation for tests and internal model composition.
+    /// Normal execution must transition through `commitStepResult`.
     func complete(at: Int64) throws -> ExecutionSession {
         try rejectTerminal()
         try requireStatus(.running, .paused)
@@ -386,5 +391,40 @@ private extension ExecutionStepRecord {
         stepID == other.stepID &&
             routineIteration == other.routineIteration &&
             stepIteration == other.stepIteration
+    }
+}
+
+
+extension ExecutionSession {
+    /// Atomically commits the result for the current scheduled round.
+    ///
+    /// The position is derived exclusively from this session's snapshot and
+    /// progress. The scheduler is recomputed here; no externally supplied
+    /// SchedulePlan is trusted. Records, progress, and a possible terminal
+    /// status are committed by one new validated ExecutionSession.
+    ///
+    /// This method does not validate COUNT target completion, COMPLETE
+    /// confirmation, or TIMER completion. Only a verified execution control
+    /// layer may call it; UI code must not construct StepRoundResult and submit
+    /// it directly.
+    func commitStepResult(_ result: StepRoundResult) throws -> ExecutionSession {
+        let plan = try ExecutionScheduler.planNext(session: self, result: result)
+        let nextStatus: ExecutionStatus = plan.kind == .complete ? .completed : .running
+        let nextProgress = plan.nextProgress ?? progress
+        let nextTimerState = plan.nextProgress.map {
+            initialTimerStateForStep(routineSnapshot.steps[$0.currentStepIndex])
+        } ?? timerState
+        let completedAt = plan.kind == .complete ? plan.record.endedAt : nil
+        return try ExecutionSession(
+            sessionID: sessionID,
+            routineSnapshot: routineSnapshot,
+            status: nextStatus,
+            progress: nextProgress,
+            timerState: nextTimerState,
+            records: records + [plan.record],
+            startedAt: startedAt,
+            completedAt: completedAt,
+            cancelledAt: nil
+        )
     }
 }

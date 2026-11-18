@@ -46,6 +46,11 @@ class ExecutionSession(
         return copy(status = ExecutionStatus.RUNNING)
     }
 
+    /**
+     * Low-level state operation for tests and internal model composition.
+     * It appends a record without advancing progress and is not a scheduling
+     * entry point. Normal execution must use [commitStepResult].
+     */
     fun appendRecord(record: ExecutionStepRecord): ExecutionSession {
         rejectTerminal()
         requireStatus(
@@ -64,6 +69,10 @@ class ExecutionSession(
         return copy(status = ExecutionStatus.CANCELLED, cancelledAt = at)
     }
 
+    /**
+     * Low-level terminal operation for tests and internal model composition.
+     * Normal execution must transition through [commitStepResult].
+     */
     fun complete(at: Long): ExecutionSession {
         rejectTerminal()
         requireStatus(
@@ -72,6 +81,47 @@ class ExecutionSession(
             ExecutionStatus.PAUSED
         )
         return copy(status = ExecutionStatus.COMPLETED, completedAt = at)
+    }
+
+    /**
+     * Atomically commits the result for the current scheduled round.
+     *
+     * The result position is derived exclusively from this session's snapshot
+     * and progress. The scheduler is recomputed here; no externally supplied
+     * SchedulePlan is trusted. Records, progress, and a possible terminal
+     * status are committed by one new validated ExecutionSession.
+     *
+     * This method does not validate COUNT target completion, COMPLETE
+     * confirmation, or TIMER completion. Only a verified execution control
+     * layer may call it; UI code must not construct StepRoundResult and submit
+     * it directly.
+     */
+    fun commitStepResult(result: StepRoundResult): ExecutionSession {
+        val plan = ExecutionScheduler.planNext(this, result)
+        val nextStatus = if (plan.kind == ScheduleKind.COMPLETE) {
+            ExecutionStatus.COMPLETED
+        } else {
+            ExecutionStatus.RUNNING
+        }
+        val nextProgress = plan.nextProgress ?: progress
+        val nextTimerState = plan.nextProgress?.let { next ->
+            initialTimerState(routineSnapshot.steps[next.currentStepIndex])
+        } ?: timerState
+        return ExecutionSession(
+            sessionId = sessionId,
+            routineSnapshot = routineSnapshot,
+            status = nextStatus,
+            progress = nextProgress,
+            timerState = nextTimerState,
+            records = records + plan.record,
+            startedAt = startedAt,
+            completedAt = if (plan.kind == ScheduleKind.COMPLETE) {
+                plan.record.endedAt
+            } else {
+                null
+            },
+            cancelledAt = null
+        )
     }
 
     private fun copy(
