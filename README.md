@@ -1,14 +1,16 @@
 # Flow
 
-Phase 2 原生工程：Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的可构建空白 App。应用启动页仅显示 `Flow`；当前不包含解析器、序列化器、草稿、卡片编辑、计时器或数据库实现。
+Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。当前已实现流程编辑（文本/卡片）、解析与序列化、稳定步骤 ID、执行引擎与阶段七双端回归；执行 UI、持久化和后台恢复仍属于后续阶段。
 
 ## 已确定配置
 - Android：Kotlin + Jetpack Compose，最低 Android 10 / API 29；当前 `compileSdk/targetSdk = 33`，包名 `com.flow.app`
 - iOS：Swift + SwiftUI，最低 iOS 16；Bundle Identifier `com.flow.app`
-- UI：现代卡片风（当前仅空白启动页）
+- UI：现代卡片风；编辑界面已接入，执行界面仍待后续阶段。
 - 首版本地优先，无账号、无服务端
 
 ## 工程状态
+
+当前处于阶段七执行引擎收尾。执行引擎已完成并通过双端测试；产品尚未完成执行 UI、持久化、后台恢复和历史展示，不是完整可发布应用。
 
 - Android 工程根目录：`android/`；Gradle Wrapper 7.6.1，AGP 7.4.2，Kotlin 1.8.22，Compose BOM 2023.06.01。
 - iOS 工程：`ios/Flow.xcodeproj`；Xcode 工程文件由 `ios/project.yml` 生成，部署目标 iOS 16.0。
@@ -57,6 +59,25 @@ Phase 2 原生工程：Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 
 - 文字与卡片语义无损，不要求保留原始空格/单位写法；无法表示的步骤（MANUAL、非整秒时长等）必须阻止序列化。
 - 卡片修改 COUNT/TIMER 类型时保留步骤 ID；文本模式无法可靠匹配类型变更时允许新 ID。
 - V1.1 不支持 MANUAL；解析、序列化、校验、保存均拒绝。
+- 阶段七执行引擎已完成；执行 UI、持久化和后台恢复属于后续阶段。
 
-## 尚未实现
-V1.1 解析器/序列化器、双向编辑状态与 ID 匹配、Room/SQLite 持久化、拖拽排序 UI、完整卡片编辑、执行引擎、通知和后台运行。当前 App 只显示启动页 `Flow`。
+## 当前状态
+
+已实现：
+
+- V1.1 文本解析、序列化、双向编辑状态与稳定步骤 ID
+- Routine / RoutineStep 领域模型与校验
+- Android/iOS 执行引擎：ExecutionSession、Scheduler、Controller、TimerEngine
+- COUNT INCREMENT / COMPLETE、SKIP、TIMER 生命周期、PAUSE/RESUME/CANCEL
+- Timer Plan/Commit、ActiveTimerReference、并发保护与失败原子性
+- 阶段七双端执行引擎回归测试
+
+仍未实现：
+
+- 执行 UI 接入与真实设备交互验收
+- Room/SQLite 持久化、进程重启恢复
+- 后台/锁屏计时恢复、通知
+- 执行历史展示
+- 卡片拖拽排序 UI（卡片字段编辑已实现）
+
+当前处于阶段七执行引擎收尾，尚未形成完整可发布产品。

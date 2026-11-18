@@ -204,3 +204,111 @@
 - [ ] SKIP 只跳过当前轮次并遵循步骤/流程重复顺序
 - [ ] SKIPPED 不计入 completedCount，skippedCount 正确增加
 - [ ] COMPLETE/SKIP 失败时 Session、records、progress、status、时间字段和 revision 不变
+
+---
+
+# 阶段七执行引擎验收（当前工作区）
+
+本清单依据阶段七代码/测试提交 `bcf48a6b577c119f2031aa3f86adaed5de45bdcf` 的 Android/iOS 源码和实际测试结果。
+执行引擎代码已实现；以下为当前验收证据。
+
+## 领域模型与执行状态
+
+- [x] COUNT / TIMER 类型，COUNT INCREMENT/COMPLETE，REST = TIMER + REST
+- [x] MANUAL 不在 V1 模型/解析/序列化/执行中支持
+- [x] READY / RUNNING / PAUSED / COMPLETED / CANCELLED 状态及终态约束
+- [x] 空流程拒绝创建 Session
+- [x] Routine snapshot 与后续 Routine 修改隔离
+- [x] currentRoundStartedAt、startedAt、completedAt、cancelledAt 生命周期
+- 证据：Android/iOS ExecutionSessionTests、ExecutionControllerTests、ExecutionTimerStateTests
+
+## Scheduler 与 records
+
+- [x] 步骤顺序由 steps 数组决定
+- [x] Scheduler 重新计算推进，不信任外部 SchedulePlan
+- [x] records 唯一键 stepId + routineIteration + stepIteration
+- [x] COMPLETED 会话 records 覆盖全部合法轮次
+- [x] completedAt = 最后一条 record.endedAt
+- [x] completedCount / skippedCount 从 records 派生
+- 证据：ExecutionSchedulingTests、ExecutionEngineIntegrationTest、iOS 集成场景
+
+## COUNT
+
+- [x] INCREMENT 未达 target 只增加 currentCount
+- [x] 达标自动生成 COMPLETED 并推进
+- [x] COMPLETE 只确认一次且不伪造计数
+- [x] 新轮次 currentCount 清零
+- [x] 非法 COUNT 操作失败且原子
+- 证据：ExecutionCountingTests、ExecutionCompleteSkipTests、集成测试
+
+## SKIP
+
+- [x] COUNT INCREMENT / COMPLETE / TIMER 均可跳过当前轮次
+- [x] 步骤剩余轮次进入下一轮，否则进入下一步骤/流程
+- [x] SKIPPED 不计入 completedCount
+- [x] TIMER 到期优先于 SKIP；commit 时 now >= deadline -> COMPLETED
+- [x] 不生成重复 records
+- 证据：ExecutionCompleteSkipTests、ExecutionEngineIntegrationTest、iOS 集成/并发测试
+
+## TIMER 基础与生命周期
+
+- [x] deadline 使用单调时钟，records 使用 Unix epoch 毫秒
+- [x] snapshot 纯查询
+- [x] poll 负责到期转换，重复 poll 幂等
+- [x] now >= deadline 统一处理
+- [x] pause/resume/cancel 到期优先级
+- [x] Resume anchor 同周期固定
+- [x] TimerRunId 隔离，旧 run 事件不影响新 run
+- [x] Plan 不可伪造，重复提交安全
+- [x] TIMER→TIMER 在同一推进事务内启动
+- 证据：ExecutionTimerEngineTests、ExecutionControllerTimerLifecycleTests、并发/集成测试
+
+## PAUSE / RESUME / CANCEL
+
+- [x] COUNT 暂停保留进度
+- [x] TIMER 暂停保存剩余时间，暂停期间不消耗
+- [x] 恢复使用固定 anchor，commit 到期自然完成
+- [x] 未到期 CANCEL 不伪造完成记录
+- [x] 已到期 CANCEL 先完成当前 TIMER 再取消剩余流程
+- [x] 完成后流程结束则 COMPLETED，否则 CANCELLED
+- [x] 终态不可恢复，reference 清空，cancelledAt 合法
+- 证据：ExecutionControllerTimerLifecycleTests、iOS TimerStartTests、集成测试
+
+## 并发与异常
+
+- [x] Android synchronized 覆盖完整事务
+- [x] iOS @MainActor 覆盖完整事务
+- [x] 同一 revision 并发最多一个成功
+- [x] 旧 revision / 旧 runId 隔离
+- [x] revision 溢出安全
+- [x] prepare/commit/Session/Scheduler 失败原子性
+- [x] 无 sleep/随机延迟依赖
+- 证据：ExecutionControllerConcurrencyTest（Android 14 tests）、iOS 并发测试
+
+## ActiveTimerReference
+
+- [x] RUNNING/PAUSED TIMER 有匹配 reference
+- [x] COUNT 无活动 reference
+- [x] 终态清除 reference
+- [x] sessionId/routineIteration/stepId/stepIteration/runId 完整校验
+- 证据：TimerBindingTests、集成不变量检查、生产 validateActiveTimerReference
+
+## 双端一致性与集成
+
+- [x] COUNT/TIMER 混合、步骤重复、流程重复、SKIP、PAUSE/RESUME、CANCEL
+- [x] 综合流程 G：routine=2、step repeat=2、SKIP、PAUSE/RESUME、8 records、revision=15
+- [x] Android/iOS 最终状态、progress、records、TimerState、reference、revision 语义一致
+- [x] Android 全量 350 tests、0 failures
+- [x] iOS 全量 351 tests、0 failures
+- [x] Parser 88/88 双端
+- [x] Android assembleDebug 成功
+- [x] iOS Simulator build/test 成功
+- 证据：ExecutionEngineIntegrationTest、iOS 集成场景、当前全量测试输出
+
+## 不属于阶段七、留待后续
+
+- [ ] 执行 UI 接入
+- [ ] 本地持久化与进程重启恢复
+- [ ] 后台/锁屏/设备重启计时恢复
+- [ ] 执行历史展示
+- [ ] 真实设备交互验收
