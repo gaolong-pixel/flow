@@ -1,6 +1,8 @@
 package com.flow.app.domain.execution
 
+import com.flow.app.domain.model.CountMode
 import com.flow.app.domain.model.Routine
+import com.flow.app.domain.model.StepType
 import java.util.UUID
 
 fun interface ExecutionClock {
@@ -19,7 +21,11 @@ enum class ExecutionControllerError {
     TERMINAL_SESSION,
     STALE_OPERATION,
     INVALID_TIMESTAMP,
-    INVALID_SESSION_STATE
+    INVALID_SESSION_STATE,
+    NOT_COUNT_STEP,
+    COUNT_MODE_NOT_INCREMENT,
+    COUNT_ALREADY_AT_TARGET,
+    INVALID_COUNT_STATE
 }
 
 data class ExecutionControllerSnapshot(
@@ -42,6 +48,25 @@ sealed interface ExecutionControllerResult {
 sealed interface ExecutionControllerCreateResult {
     data class Success(val controller: ExecutionController) : ExecutionControllerCreateResult
     data class Failure(val error: ExecutionControllerError) : ExecutionControllerCreateResult
+}
+
+sealed interface CountIncrementResult {
+    data class Incremented(
+        val session: ExecutionSession,
+        val revision: Long,
+        val currentCount: Int,
+        val target: Int
+    ) : CountIncrementResult
+
+    data class RoundCompleted(
+        val session: ExecutionSession,
+        val revision: Long
+    ) : CountIncrementResult
+
+    data class Failure(
+        val error: ExecutionControllerError,
+        val revision: Long
+    ) : CountIncrementResult
 }
 
 class ExecutionController internal constructor(
@@ -70,6 +95,117 @@ class ExecutionController internal constructor(
         if (now < 0L) return failure(ExecutionControllerError.INVALID_TIMESTAMP)
         return runTransition {
             session.start(now)
+        }
+    }
+
+    fun incrementCount(expectedRevision: Long): CountIncrementResult = synchronized(lock) {
+        if (expectedRevision != revisionValue) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.STALE_OPERATION,
+                revision = revisionValue
+            )
+        }
+        if (session.status == ExecutionStatus.COMPLETED ||
+            session.status == ExecutionStatus.CANCELLED
+        ) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.TERMINAL_SESSION,
+                revision = revisionValue
+            )
+        }
+        if (session.status != ExecutionStatus.RUNNING) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.SESSION_NOT_RUNNING,
+                revision = revisionValue
+            )
+        }
+
+        val step = session.routineSnapshot.steps[session.progress.currentStepIndex]
+        if (step.type != StepType.COUNT) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.NOT_COUNT_STEP,
+                revision = revisionValue
+            )
+        }
+        if (step.countMode != CountMode.INCREMENT) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.COUNT_MODE_NOT_INCREMENT,
+                revision = revisionValue
+            )
+        }
+        val target = step.target
+        if (target == null || target <= 0) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.INVALID_COUNT_STATE,
+                revision = revisionValue
+            )
+        }
+        val current = session.progress.currentCount
+        if (current < 0 || current > target) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.INVALID_COUNT_STATE,
+                revision = revisionValue
+            )
+        }
+        if (current == target) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.COUNT_ALREADY_AT_TARGET,
+                revision = revisionValue
+            )
+        }
+
+        val now = clock.now()
+        if (now < 0L) {
+            return CountIncrementResult.Failure(
+                error = ExecutionControllerError.INVALID_TIMESTAMP,
+                revision = revisionValue
+            )
+        }
+        val roundStart = session.currentRoundStartedAt
+            ?: return CountIncrementResult.Failure(
+                error = ExecutionControllerError.INVALID_SESSION_STATE,
+                revision = revisionValue
+            )
+        val willComplete = current + 1 == target
+        val completion = StepRoundResult(
+            outcome = ExecutionStepOutcome.COMPLETED,
+            startedAt = roundStart,
+            endedAt = now
+        )
+
+        return try {
+            val next = session.incrementCountAndMaybeComplete(completion)
+            session = next
+            revisionValue += 1L
+            if (willComplete) {
+                CountIncrementResult.RoundCompleted(
+                    session = next,
+                    revision = revisionValue
+                )
+            } else {
+                CountIncrementResult.Incremented(
+                    session = next,
+                    revision = revisionValue,
+                    currentCount = current + 1,
+                    target = target
+                )
+            }
+        } catch (error: ExecutionValidationException) {
+            countFailure(
+                if (error.code == ExecutionValidationError.INVALID_TIMESTAMP) {
+                    ExecutionControllerError.INVALID_TIMESTAMP
+                } else {
+                    ExecutionControllerError.INVALID_SESSION_STATE
+                }
+            )
+        } catch (error: ExecutionSchedulingException) {
+            countFailure(
+                if (error.code == SchedulingError.INVALID_RESULT_TIMESTAMP) {
+                    ExecutionControllerError.INVALID_TIMESTAMP
+                } else {
+                    ExecutionControllerError.INVALID_SESSION_STATE
+                }
+            )
         }
     }
 
@@ -155,6 +291,9 @@ class ExecutionController internal constructor(
 
     private fun failure(error: ExecutionControllerError): ExecutionControllerResult.Failure =
         ExecutionControllerResult.Failure(error = error, revision = revisionValue)
+
+    private fun countFailure(error: ExecutionControllerError): CountIncrementResult.Failure =
+        CountIncrementResult.Failure(error = error, revision = revisionValue)
 
     companion object {
         fun create(

@@ -68,6 +68,60 @@ struct ExecutionSession {
         return try copy(status: .running)
     }
 
+    /// Atomically increments the current COUNT/INCREMENT round.
+    ///
+    /// Below target this returns a new Session with only currentCount changed.
+    /// At target it builds an internal target-count candidate and calls
+    /// `commitStepResult`; the intermediate target-count Session is never
+    /// returned. This method is only for the verified execution controller.
+    func incrementCountAndMaybeComplete(
+        _ completion: StepRoundResult
+    ) throws -> ExecutionSession {
+        try rejectTerminal()
+        try requireStatus(.running)
+
+        let step = routineSnapshot.steps[progress.currentStepIndex]
+        guard step.type == .count, step.countMode == .increment else {
+            throw ExecutionValidationError.invalidStatus
+        }
+        guard let target = step.target, target > 0 else {
+            throw ExecutionValidationError.invalidCount
+        }
+        let current = progress.currentCount
+        guard current >= 0, current <= target else {
+            throw ExecutionValidationError.invalidCount
+        }
+        guard current < target else {
+            throw ExecutionValidationError.invalidCount
+        }
+
+        let newCount = current + 1
+        if newCount < target {
+            return try copy(
+                progress: ExecutionProgress(
+                    routineIteration: progress.routineIteration,
+                    currentStepIndex: progress.currentStepIndex,
+                    currentStepID: progress.currentStepID,
+                    stepIteration: progress.stepIteration,
+                    currentCount: newCount,
+                    completeConfirmed: progress.completeConfirmed
+                )
+            )
+        }
+
+        let targetSession = try copy(
+            progress: ExecutionProgress(
+                routineIteration: progress.routineIteration,
+                currentStepIndex: progress.currentStepIndex,
+                currentStepID: progress.currentStepID,
+                stepIteration: progress.stepIteration,
+                currentCount: target,
+                completeConfirmed: progress.completeConfirmed
+            )
+        )
+        return try targetSession.commitStepResult(completion)
+    }
+
     /// Low-level state operation for tests and internal model composition.
     /// It appends a record without advancing progress and is not a scheduling
     /// entry point. Normal execution must use `commitStepResult`.

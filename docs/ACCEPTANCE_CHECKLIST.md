@@ -181,3 +181,14 @@
 - [ ] 本轮结果时间早于 currentRoundStartedAt 时被拒绝且不修改状态
 - [ ] 时钟倒退时取消操作被拒绝且 revision 不变
 - [ ] 控制器生命周期双端语义一致
+
+
+## COUNT INCREMENT 执行
+
+- [ ] 未达目标只增加 currentCount，不生成记录
+- [ ] 达到目标时原子生成一条 COMPLETED 记录并推进
+- [ ] 下一轮/下一步骤/下一流程的 currentCount 清零
+- [ ] 最后一轮完成后会话为 COMPLETED
+- [ ] 暂停、取消、完成状态禁止计数
+- [ ] 非 COUNT 和 COUNT + COMPLETE 禁止调用 INCREMENT
+- [ ] 过期 revision、非法计数和提交失败不改变 Session 或 revision

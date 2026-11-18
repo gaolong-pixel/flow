@@ -87,6 +87,15 @@
 - `ExecutionStepRecord.startedAt`/`endedAt` 表示当前轮次的实际时间跨度，暂停时间包含在跨度内；本阶段不统计有效运动时长。
 - `ExecutionController.revision` 是控制器操作版本，不属于 ExecutionSession。成功状态变化递增一次；失败和查询不递增；修改操作必须携带 `expectedRevision`。
 
+## COUNT INCREMENT 执行
+
+- 仅 RUNNING 的 COUNT + INCREMENT 当前轮次允许计数。
+- 每次计数只增加当前轮次 `currentCount`；未达到目标时不生成 `ExecutionStepRecord`，不推进执行位置。
+- 达到目标时，计数、COMPLETED 记录、下一 progress/终态由同一次领域操作原子提交。
+- 完成后进入下一轮、下一步骤或下一流程时，`currentCount` 从 0 开始。
+- 暂停、取消、完成状态禁止计数；COUNT + COMPLETE、非 COUNT 步骤禁止调用 INCREMENT。
+- 过期 revision、非法计数状态或调度提交失败不得改变 Session 或 revision。
+
 ## 校验
 
 - 步骤名称的首尾 Unicode 空白不具有业务意义：创建和编辑入口统一 trim；trim 后非空；内部空白保留；名称不得包含换行。

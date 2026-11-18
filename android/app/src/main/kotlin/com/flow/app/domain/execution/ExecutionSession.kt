@@ -2,6 +2,7 @@ package com.flow.app.domain.execution
 
 import com.flow.app.domain.model.Routine
 import com.flow.app.domain.model.RoutineStep
+import com.flow.app.domain.model.CountMode
 import com.flow.app.domain.model.StepType
 import java.util.Collections
 import java.util.UUID
@@ -49,6 +50,48 @@ class ExecutionSession(
     fun resume(): ExecutionSession {
         requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.PAUSED)
         return copy(status = ExecutionStatus.RUNNING)
+    }
+
+    /**
+     * Atomically increments the current COUNT/INCREMENT round.
+     *
+     * Below target this returns a new Session with only currentCount changed.
+     * At target it builds an internal target-count candidate and calls
+     * [commitStepResult]; the intermediate target-count Session is never
+     * returned. This method is only for the verified execution controller.
+     */
+    internal fun incrementCountAndMaybeComplete(
+        completion: StepRoundResult
+    ): ExecutionSession {
+        rejectTerminal()
+        requireStatus(ExecutionValidationError.INVALID_STATUS, ExecutionStatus.RUNNING)
+
+        val step = routineSnapshot.steps[progress.currentStepIndex]
+        if (step.type != StepType.COUNT ||
+            step.countMode != CountMode.INCREMENT
+        ) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_STATUS)
+        }
+        val target = step.target
+            ?: throw ExecutionValidationException(ExecutionValidationError.INVALID_COUNT)
+        if (target <= 0) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_COUNT)
+        }
+        val current = progress.currentCount
+        if (current < 0 || current > target) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_COUNT)
+        }
+        if (current == target) {
+            throw ExecutionValidationException(ExecutionValidationError.INVALID_COUNT)
+        }
+
+        val newCount = current + 1
+        if (newCount < target) {
+            return copy(progress = progress.copy(currentCount = newCount))
+        }
+
+        val targetSession = copy(progress = progress.copy(currentCount = target))
+        return targetSession.commitStepResult(completion)
     }
 
     /**

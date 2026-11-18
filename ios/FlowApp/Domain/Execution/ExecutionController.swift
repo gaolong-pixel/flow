@@ -19,6 +19,10 @@ enum ExecutionControllerError: Error, Equatable {
     case staleOperation
     case invalidTimestamp
     case invalidSessionState
+    case notCountStep
+    case countModeNotIncrement
+    case countAlreadyAtTarget
+    case invalidCountState
 }
 
 struct ExecutionControllerSnapshot {
@@ -34,6 +38,17 @@ enum ExecutionControllerResult {
 enum ExecutionControllerCreateResult {
     case success(ExecutionController)
     case failure(ExecutionControllerError)
+}
+
+enum CountIncrementResult {
+    case incremented(
+        session: ExecutionSession,
+        revision: Int64,
+        currentCount: Int,
+        target: Int
+    )
+    case roundCompleted(session: ExecutionSession, revision: Int64)
+    case failure(error: ExecutionControllerError, revision: Int64)
 }
 
 @MainActor
@@ -66,6 +81,76 @@ final class ExecutionController {
         let now = clock.now
         guard now >= 0 else { return failure(.invalidTimestamp) }
         return runTransition { try self.session.start(at: now) }
+    }
+
+    func incrementCount(expectedRevision: Int64) -> CountIncrementResult {
+        if expectedRevision != revisionValue {
+            return .failure(error: .staleOperation, revision: revisionValue)
+        }
+        if session.status == .completed || session.status == .cancelled {
+            return .failure(error: .terminalSession, revision: revisionValue)
+        }
+        guard session.status == .running else {
+            return .failure(error: .sessionNotRunning, revision: revisionValue)
+        }
+
+        let step = session.routineSnapshot.steps[session.progress.currentStepIndex]
+        guard step.type == .count else {
+            return .failure(error: .notCountStep, revision: revisionValue)
+        }
+        guard step.countMode == .increment else {
+            return .failure(error: .countModeNotIncrement, revision: revisionValue)
+        }
+        guard let target = step.target, target > 0 else {
+            return .failure(error: .invalidCountState, revision: revisionValue)
+        }
+        let current = session.progress.currentCount
+        guard current >= 0, current <= target else {
+            return .failure(error: .invalidCountState, revision: revisionValue)
+        }
+        guard current < target else {
+            return .failure(error: .countAlreadyAtTarget, revision: revisionValue)
+        }
+
+        let now = clock.now
+        guard now >= 0 else {
+            return .failure(error: .invalidTimestamp, revision: revisionValue)
+        }
+        guard let roundStart = session.currentRoundStartedAt else {
+            return .failure(error: .invalidSessionState, revision: revisionValue)
+        }
+
+        let willComplete = current + 1 == target
+        let completion = StepRoundResult(
+            outcome: .completed,
+            startedAt: roundStart,
+            endedAt: now
+        )
+
+        do {
+            let next = try session.incrementCountAndMaybeComplete(completion)
+            session = next
+            revisionValue += 1
+            if willComplete {
+                return .roundCompleted(session: next, revision: revisionValue)
+            }
+            return .incremented(
+                session: next,
+                revision: revisionValue,
+                currentCount: current + 1,
+                target: target
+            )
+        } catch let error as ExecutionValidationError {
+            return countFailure(
+                error == .invalidTimestamp ? .invalidTimestamp : .invalidSessionState
+            )
+        } catch let error as SchedulingError {
+            return countFailure(
+                error == .invalidResultTimestamp ? .invalidTimestamp : .invalidSessionState
+            )
+        } catch {
+            return countFailure(.invalidSessionState)
+        }
     }
 
     func pause(expectedRevision: Int64) -> ExecutionControllerResult {
@@ -150,6 +235,10 @@ final class ExecutionController {
     }
 
     private func failure(_ error: ExecutionControllerError) -> ExecutionControllerResult {
+        .failure(error: error, revision: revisionValue)
+    }
+
+    private func countFailure(_ error: ExecutionControllerError) -> CountIncrementResult {
         .failure(error: error, revision: revisionValue)
     }
 }
