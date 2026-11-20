@@ -66,6 +66,9 @@ final class FlowRunFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["已暂停"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["run-primary"].label, "继续计时")
         XCTAssertEqual(app.buttons["run-secondary"].label, "完成当前节点")
+        let pausedCountdown = app.staticTexts["run-countdown"].label
+        Thread.sleep(forTimeInterval: 1.2)
+        XCTAssertEqual(app.staticTexts["run-countdown"].label, pausedCountdown)
         attachScreenshot("timer-paused")
         app.buttons["run-primary"].tap()
         app.buttons["run-secondary"].tap()
@@ -136,6 +139,36 @@ final class FlowRunFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.staticTexts["4 个节点"].exists)
         XCTAssertTrue(app.staticTexts["2 个节点"].exists)
+    }
+
+    func testLaunchCountdownCanBeSkippedWithoutDoubleStart() {
+        createPlan(expectedTotalPlans: 1, steps: [
+            CardStep(type: .count, name: "Launch", value: 5)
+        ])
+
+        let start = app.buttons.matching(identifier: "plan-start").firstMatch
+        XCTAssertTrue(start.waitForExistence(timeout: 8))
+        start.tap()
+
+        let setupStart = app.buttons["setup-start"]
+        XCTAssertTrue(setupStart.waitForExistence(timeout: 8))
+        setupStart.tap()
+
+        let skip = app.buttons["launch-skip"]
+        XCTAssertTrue(skip.waitForExistence(timeout: 3))
+        // The session must not exist while the countdown is running.
+        XCTAssertFalse(app.buttons["run-primary"].exists)
+        attachScreenshot("launch-countdown")
+
+        skip.tap()
+        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["1 / 1"].exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "run-primary").count, 1)
+
+        app.buttons["run-exit"].tap()
+        let alert = app.alerts["退出本次运行？"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["退出运行"].tap()
     }
 
     // MARK: - Helpers

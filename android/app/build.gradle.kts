@@ -68,8 +68,8 @@ android {
         applicationId = "com.flow.app"
         minSdk = 29
         targetSdk = 33
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
     }
 
     signingConfigs {

@@ -2,6 +2,7 @@ package com.flow.app.presentation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,12 +51,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextRange
@@ -93,6 +98,8 @@ import com.flow.app.domain.run.RunStartError
 import com.flow.app.domain.run.RunSummary
 import com.flow.app.domain.run.StartRunResult
 import com.flow.app.domain.run.formatCountdown
+import com.flow.app.domain.run.formatDurationLabel
+import com.flow.app.domain.run.flowPlanDurationLabel
 import java.io.File
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -110,6 +117,8 @@ fun FlowApp(onBack: () -> Unit = {}) {
     var setupMessage by remember { mutableStateOf<String?>(null) }
     var exitSummary by remember { mutableStateOf<RunSummary?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var launchDark by remember { mutableStateOf(false) }
+    var lastRunPlanId by remember { mutableStateOf<String?>(null) }
     val runtime by coordinator.runtime.collectAsState()
 
     fun reload() {
@@ -124,6 +133,7 @@ fun FlowApp(onBack: () -> Unit = {}) {
     LaunchedEffect(Unit) { reload() }
 
     FlowTheme {
+        FlowSystemBars(dark = runtime is RunRuntimeState.Active || launchDark)
         when (val current = runtime) {
             is RunRuntimeState.Active -> {
                 RunScreen(
@@ -139,8 +149,16 @@ fun FlowApp(onBack: () -> Unit = {}) {
             }
 
             is RunRuntimeState.Finished -> {
+                val rerunPlan = lastRunPlanId?.let { id -> plans.firstOrNull { it.id == id } }
                 RunResultScreen(
                     summary = current.summary,
+                    canRunAgain = rerunPlan != null,
+                    onRunAgain = {
+                        coordinator.dismissResult()
+                        exitSummary = null
+                        setupMessage = null
+                        setupPlan = rerunPlan
+                    },
                     onBackToPlans = {
                         coordinator.dismissResult()
                         exitSummary = null
@@ -154,10 +172,17 @@ fun FlowApp(onBack: () -> Unit = {}) {
                 val launchPlan = setupPlan?.let { pending ->
                     plans.firstOrNull { it.id == pending.id } ?: pending
                 }
+                val rerunPlan = lastRunPlanId?.let { id -> plans.firstOrNull { it.id == id } }
                 when {
                     exitSummary != null -> {
                         RunExitResultScreen(
                             summary = exitSummary!!,
+                            canRunAgain = rerunPlan != null,
+                            onRunAgain = {
+                                exitSummary = null
+                                setupPlan = rerunPlan
+                                setupMessage = null
+                            },
                             onBackToPlans = {
                                 exitSummary = null
                                 reload()
@@ -180,13 +205,17 @@ fun FlowApp(onBack: () -> Unit = {}) {
                             onBack = {
                                 setupPlan = null
                                 setupMessage = null
+                                launchDark = false
                             },
                             onStart = {
                                 when (val result = coordinator.start(launchPlan)) {
                                     is StartRunResult.Started -> {
+                                        lastRunPlanId = launchPlan.id
                                         setupPlan = null
                                         setupMessage = null
                                         exitSummary = null
+                                        launchDark = false
+                                        true
                                     }
 
                                     is StartRunResult.Rejected -> {
@@ -196,7 +225,25 @@ fun FlowApp(onBack: () -> Unit = {}) {
                                             RunStartError.EMPTY_PLAN ->
                                                 "计划没有节点，无法运行。"
                                         }
+                                        false
                                     }
+                                }
+                            },
+                            onLaunchingChanged = { launchDark = it },
+                            onEdit = {
+                                editingId = launchPlan.id
+                                setupPlan = null
+                                setupMessage = null
+                                launchDark = false
+                            },
+                            onDelete = {
+                                if (store.delete(launchPlan.id)) {
+                                    setupPlan = null
+                                    setupMessage = null
+                                    launchDark = false
+                                    reload()
+                                } else {
+                                    setupMessage = "删除计划失败"
                                 }
                             }
                         )
@@ -215,13 +262,10 @@ fun FlowApp(onBack: () -> Unit = {}) {
                                     error = "保存计划失败"
                                 }
                             },
-                            onOpen = { editingId = it.id },
-                            onStart = {
+                            onOpen = {
                                 setupPlan = it
                                 setupMessage = null
-                            },
-                            onDelete = { plan ->
-                                if (store.delete(plan.id)) reload() else error = "删除计划失败"
+                                launchDark = false
                             }
                         )
                     }
@@ -236,269 +280,272 @@ private fun PlanHomeScreen(
     plans: List<Routine>,
     error: String?,
     onCreate: () -> Unit,
-    onOpen: (Routine) -> Unit,
-    onStart: (Routine) -> Unit,
-    onDelete: (Routine) -> Unit
+    onOpen: (Routine) -> Unit
 ) {
-    var deleteCandidate by remember { mutableStateOf<Routine?>(null) }
-    Surface(Modifier.fillMaxSize(), color = FlowBackground) {
+    Box(Modifier.fillMaxSize()) {
+        FlowLightArt(FlowArtMode.Home)
         Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(horizontal = FlowSpacing.page, vertical = 16.dp)
         ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FlowSpacing.page, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FlowBoltMark(size = 22.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Flow",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.4).sp,
+                    color = FlowText
+                )
+            }
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(
+                    start = FlowSpacing.page,
+                    end = FlowSpacing.page,
+                    bottom = 28.dp
+                )
+            ) {
+                item {
+                    Spacer(Modifier.height(20.dp))
                     Text(
-                        text = "Flow",
-                        fontSize = 30.sp,
+                        text = "让执行更简单",
+                        fontSize = 28.sp,
+                        lineHeight = 34.sp,
                         fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.6).sp,
                         color = FlowText
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(5.dp))
                     Text(
-                        text = "把流程变成可执行的步骤",
+                        text = "专注当下，完成每一个步骤",
                         fontSize = 13.sp,
                         color = FlowSecondaryText
                     )
                 }
-                Button(
-                    onClick = onCreate,
-                    modifier = Modifier
-                        .width(92.dp)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("＋ 新建", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                item {
+                    Spacer(Modifier.height(22.dp))
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        HomeCreateButton(onCreate = onCreate)
+                    }
                 }
-            }
-
-            Spacer(Modifier.height(34.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "我的流程",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = FlowText
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = "${plans.size} 个流程",
-                    fontSize = 13.sp,
-                    color = FlowSecondaryText
-                )
-            }
-
-            if (error != null) {
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = FlowDangerSoft
-                ) {
-                    Text(
-                        text = error,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = FlowDanger
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            if (plans.isEmpty()) {
-                HomeEmptyState(onCreate = onCreate)
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(plans.size) { index ->
-                        PlanCard(
-                            plan = plans[index],
-                            onOpen = { onOpen(plans[index]) },
-                            onStart = { onStart(plans[index]) },
-                            onDelete = { deleteCandidate = plans[index] }
+                item {
+                    Spacer(Modifier.height(29.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "我的流程",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = FlowText
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = "${plans.size} 个流程",
+                            fontSize = 11.5.sp,
+                            color = FlowSecondaryText
                         )
                     }
-                    item { Spacer(Modifier.height(8.dp)) }
+                }
+
+                if (error != null) {
+                    item {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = error,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(FlowDangerSoft, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            fontSize = 12.sp,
+                            color = FlowDanger
+                        )
+                    }
+                }
+
+                if (plans.isEmpty()) {
+                    item { HomeEmptyState() }
+                } else {
+                    item { Spacer(Modifier.height(12.dp)) }
+                    itemsIndexed(plans, key = { _, plan -> plan.id }) { index, plan ->
+                        FlowPlanCard(
+                            plan = plan,
+                            icon = when (index % 3) {
+                                0 -> FlowPlanIcon.Sun
+                                1 -> FlowPlanIcon.Target
+                                else -> FlowPlanIcon.Flow
+                            },
+                            onOpen = { onOpen(plan) }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
             }
         }
     }
+}
 
-    deleteCandidate?.let { plan ->
-        AlertDialog(
-            onDismissRequest = { deleteCandidate = null },
-            containerColor = FlowSurface,
-            tonalElevation = 0.dp,
-            titleContentColor = FlowText,
-            textContentColor = FlowSecondaryText,
-            title = { Text("删除这个流程？") },
-            text = { Text("删除后，这个流程及其节点将无法恢复。") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        deleteCandidate = null
-                        onDelete(plan)
-                    }
-                ) {
-                    Text("删除", color = FlowDanger)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteCandidate = null }) {
-                    Text("取消", color = FlowSecondaryText)
-                }
+@Composable
+private fun HomeCreateButton(onCreate: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        modifier = Modifier
+            .width(212.dp)
+            .height(48.dp)
+            .shadow(
+                elevation = 12.dp,
+                shape = shape,
+                ambientColor = FlowPrimary.copy(alpha = 0.25f),
+                spotColor = FlowPrimary.copy(alpha = 0.30f)
+            )
+            .clip(shape)
+            .background(
+                Brush.linearGradient(listOf(Color(0xFF4F8CFF), Color(0xFF2F6BFF)))
+            )
+            .clickable(onClick = onCreate)
+            .semantics { contentDescription = "创建流程" },
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Canvas(Modifier.size(15.dp)) {
+                drawLine(Color.White, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1.8.dp.toPx(), StrokeCap.Round)
+                drawLine(Color.White, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1.8.dp.toPx(), StrokeCap.Round)
             }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "创建流程",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeEmptyState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 46.dp, bottom = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        FlowPlanIconTile(icon = FlowPlanIcon.Flow, tileSize = 52.dp)
+        Spacer(Modifier.height(18.dp))
+        Text(
+            text = "还没有流程",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = FlowText
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(
+            text = "把每天要做的事，编成一条清晰的流程。",
+            fontSize = 13.sp,
+            color = FlowSecondaryText,
+            textAlign = TextAlign.Center
         )
     }
 }
 
 @Composable
-private fun FlowGraphic() {
-    Box(
-        Modifier
-            .size(72.dp)
-            .background(FlowAccentSoft, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(7.dp).background(FlowPrimary, CircleShape))
-            Box(Modifier.width(1.dp).height(8.dp).background(FlowPrimary.copy(alpha = 0.30f)))
-            Box(Modifier.size(7.dp).background(FlowPrimary, CircleShape))
-            Box(Modifier.width(1.dp).height(8.dp).background(FlowPrimary.copy(alpha = 0.30f)))
-            Box(Modifier.size(7.dp).background(FlowPrimary, CircleShape))
-        }
-    }
-}
-
-@Composable
-private fun HomeEmptyState(onCreate: () -> Unit) {
-    FlowCard(contentPadding = 24.dp) {
-        Column(
-            Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            FlowGraphic()
-            Spacer(Modifier.height(18.dp))
-            Text(
-                text = "还没有流程",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FlowText
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "创建一套流程，让每一步都有明确安排。",
-                fontSize = 13.sp,
-                color = FlowSecondaryText,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(18.dp))
-            Button(
-                onClick = onCreate,
-                modifier = Modifier.height(46.dp),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(horizontal = 18.dp)
-            ) {
-                Text("创建第一个流程", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlanCard(
+private fun FlowPlanCard(
     plan: Routine,
-    onOpen: () -> Unit,
-    onStart: () -> Unit,
-    onDelete: () -> Unit
+    icon: FlowPlanIcon,
+    onOpen: () -> Unit
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
-    FlowCard(
-        modifier = Modifier.clickable(onClick = onOpen),
-        contentPadding = 18.dp
+    val shape = RoundedCornerShape(FlowRadius.card)
+    val duration = flowPlanDurationLabel(plan.steps)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 10.dp,
+                shape = shape,
+                ambientColor = Color(0x0F1E40AF),
+                spotColor = Color(0x141E40AF)
+            )
+            .clip(shape)
+            .background(FlowSurface)
     ) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(
-                text = plan.name,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = FlowText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(5.dp))
-            Text(
-                text = "${plan.steps.size} 个节点",
-                fontSize = 13.sp,
-                color = FlowSecondaryText
-            )
-
-            if (plan.steps.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                Column {
-                    plan.steps.take(3).forEachIndexed { index, step ->
-                        PlanTimelineStep(
-                            step = step,
-                            index = index,
-                            isLast = index == plan.steps.take(3).lastIndex
+        Button(
+            onClick = onOpen,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { contentDescription = "打开流程 ${plan.name}" },
+            shape = shape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = FlowText
+            ),
+            contentPadding = PaddingValues(14.dp)
+        ) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    FlowPlanIconTile(icon = icon, tileSize = 44.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = plan.name,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = FlowText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                    }
-                }
-                if (plan.steps.size > 3) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "还有 ${plan.steps.size - 3} 个节点",
-                        fontSize = 12.sp,
-                        color = FlowSecondaryText
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    onClick = onStart,
-                    enabled = plan.steps.isNotEmpty(),
-                    modifier = Modifier
-                        .width(84.dp)
-                        .height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("开始", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                }
-                Spacer(Modifier.width(10.dp))
-                TextButton(
-                    onClick = onOpen,
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                ) {
-                    Text("编辑", fontSize = 14.sp, color = FlowPrimary)
-                }
-                Spacer(Modifier.weight(1f))
-                Box {
-                    IconButton(
-                        onClick = { menuOpen = true },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Text("⋮", fontSize = 24.sp, color = FlowSecondaryText)
-                    }
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("删除", color = FlowDanger) },
-                            onClick = {
-                                menuOpen = false
-                                onDelete()
+                        Spacer(Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${plan.steps.size} 个节点",
+                                fontSize = 11.5.sp,
+                                color = FlowSecondaryText
+                            )
+                            if (duration != null) {
+                                Box(
+                                    Modifier
+                                        .padding(horizontal = 6.dp)
+                                        .size(3.dp)
+                                        .background(FlowOutlineStrong, CircleShape)
+                                )
+                                Text(
+                                    text = duration,
+                                    fontSize = 11.5.sp,
+                                    color = FlowSecondaryText
+                                )
                             }
-                        )
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    FlowChevron(glyphSize = 14.dp, color = Color(0xFFA6B2C4))
+                }
+
+                if (plan.steps.isNotEmpty()) {
+                    Spacer(Modifier.height(9.dp))
+                    Column(Modifier.fillMaxWidth()) {
+                        val preview = plan.steps.take(3)
+                        preview.forEachIndexed { index, step ->
+                            HomeTimelineRow(
+                                step = step,
+                                index = index,
+                                isFirst = index == 0,
+                                isLast = index == preview.lastIndex
+                            )
+                        }
+                        if (plan.steps.size > 3) {
+                            HomeMoreRow(count = plan.steps.size - 3)
+                        }
                     }
                 }
             }
@@ -507,66 +554,111 @@ private fun PlanCard(
 }
 
 @Composable
-private fun PlanTimelineStep(step: RoutineStep, index: Int, isLast: Boolean) {
+private fun HomeTimelineRow(
+    step: RoutineStep,
+    index: Int,
+    isFirst: Boolean,
+    isLast: Boolean
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp),
+            .height(28.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            Modifier
-                .width(16.dp)
+            modifier = Modifier
+                .width(21.dp)
                 .fillMaxHeight()
+                .drawBehind {
+                    val x = size.width / 2f
+                    val lineColor = FlowPrimary.copy(alpha = 0.24f)
+                    if (!isFirst) {
+                        drawLine(lineColor, Offset(x, 0f), Offset(x, 14.dp.toPx()), 1.5.dp.toPx())
+                    }
+                    if (!isLast) {
+                        drawLine(lineColor, Offset(x, 14.dp.toPx()), Offset(x, size.height), 1.5.dp.toPx())
+                    }
+                },
+            contentAlignment = Alignment.Center
         ) {
-            if (index > 0) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .width(1.dp)
-                        .height(19.dp)
-                        .background(FlowConnector)
-                )
-            }
-            if (!isLast) {
-                Box(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .width(1.dp)
-                        .height(19.dp)
-                        .background(FlowConnector)
-                )
-            }
             Box(
                 Modifier
-                    .align(Alignment.Center)
-                    .size(8.dp)
-                    .background(
-                        if (step.type == StepType.COUNT) FlowPrimary else FlowWarning,
-                        CircleShape
-                    )
-            )
+                    .size(20.dp)
+                    .background(FlowPrimary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             text = step.name,
-            fontSize = 15.sp,
-            color = FlowText,
+            fontSize = 12.5.sp,
+            color = Color(0xFF334155),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Text(
-            text = compactStepTarget(step),
-            fontSize = 13.sp,
-            color = FlowSecondaryText
-        )
+        Spacer(Modifier.width(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowTypeGlyph(type = step.type, size = 11.dp)
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = if (step.type == StepType.COUNT) {
+                    "${step.target ?: 0} 次"
+                } else {
+                    formatDurationLabel(step.durationMs)
+                },
+                fontSize = 10.5.sp,
+                color = Color(0xFF8A98AB)
+            )
+        }
     }
 }
 
-private fun compactStepTarget(step: RoutineStep): String = when (step.type) {
-    StepType.COUNT -> "${step.target ?: 0} 次"
-    StepType.TIMER -> formatCountdown(step.durationMs)
+@Composable
+private fun HomeMoreRow(count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(21.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(21.dp)
+                .fillMaxHeight()
+                .drawBehind {
+                    val x = size.width / 2f
+                    drawLine(
+                        color = FlowPrimary.copy(alpha = 0.24f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, 12.dp.toPx()),
+                        strokeWidth = 1.5.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                            floatArrayOf(2.5.dp.toPx(), 3.dp.toPx())
+                        )
+                    )
+                    drawCircle(
+                        color = Color(0xFFA7B4C6),
+                        radius = 2.dp.toPx(),
+                        center = Offset(x, 14.dp.toPx())
+                    )
+                }
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "还有 $count 个节点...",
+            fontSize = 10.5.sp,
+            color = FlowSecondaryText
+        )
+    }
 }
 
 @Composable

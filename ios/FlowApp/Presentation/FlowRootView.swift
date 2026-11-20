@@ -8,7 +8,8 @@ struct PlanHomeView: View {
     @State private var setupPlan: Routine?
     @State private var setupMessage: String?
     @State private var errorMessage: String?
-    @State private var planPendingDeletion: Routine?
+    @State private var isLaunching = false
+    @State private var lastRunPlan: Routine?
 
     init(store: PlanStore) {
         self.store = store
@@ -20,20 +21,8 @@ struct PlanHomeView: View {
             content
         }
         .onAppear { reload() }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(runCoordinator.isActive || isLaunching ? .dark : .light)
         .dynamicTypeSize(.small ... .xxxLarge)
-        .alert("删除这个流程？", isPresented: Binding(
-            get: { planPendingDeletion != nil },
-            set: { if !$0 { planPendingDeletion = nil } }
-        )) {
-            Button("取消", role: .cancel) { planPendingDeletion = nil }
-            Button("删除", role: .destructive) {
-                if let plan = planPendingDeletion { delete(plan) }
-                planPendingDeletion = nil
-            }
-        } message: {
-            Text("删除后，这个流程及其节点将无法恢复。")
-        }
     }
 
     @ViewBuilder
@@ -42,16 +31,36 @@ struct PlanHomeView: View {
         case .active(let snapshot):
             RunView(coordinator: runCoordinator, snapshot: snapshot)
         case .finished(let summary):
-            RunResultView(summary: summary) {
-                runCoordinator.dismissResult()
-                reload()
-            }
-        case .idle:
-            if let summary = runCoordinator.lastExitSummary {
-                RunExitResultView(summary: summary) {
-                    runCoordinator.clearExitSummary()
+            RunResultView(
+                summary: summary,
+                canRunAgain: lastRunPlan != nil,
+                onRunAgain: {
+                    runCoordinator.dismissResult()
+                    reload()
+                    setupPlan = lastRunPlan
+                    setupMessage = nil
+                },
+                onBackToPlans: {
+                    runCoordinator.dismissResult()
                     reload()
                 }
+            )
+        case .idle:
+            if let summary = runCoordinator.lastExitSummary {
+                RunExitResultView(
+                    summary: summary,
+                    canRunAgain: lastRunPlan != nil,
+                    onRunAgain: {
+                        runCoordinator.clearExitSummary()
+                        reload()
+                        setupPlan = lastRunPlan
+                        setupMessage = nil
+                    },
+                    onBackToPlans: {
+                        runCoordinator.clearExitSummary()
+                        reload()
+                    }
+                )
             } else if let editing {
                 FlowRootView(routine: editing, store: store) {
                     self.editing = nil
@@ -64,9 +73,25 @@ struct PlanHomeView: View {
                     onBack: {
                         self.setupPlan = nil
                         self.setupMessage = nil
+                        self.isLaunching = false
                     },
                     onStart: {
                         start(setupPlan)
+                    },
+                    onLaunchingChanged: { isLaunching = $0 },
+                    onEdit: {
+                        let plan = setupPlan
+                        self.setupPlan = nil
+                        self.setupMessage = nil
+                        self.isLaunching = false
+                        self.editing = plan
+                    },
+                    onDelete: {
+                        let plan = setupPlan
+                        self.setupPlan = nil
+                        self.setupMessage = nil
+                        self.isLaunching = false
+                        delete(plan)
                     }
                 )
             } else {
@@ -76,184 +101,178 @@ struct PlanHomeView: View {
     }
 
     private var home: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Flow")
-                            .flowFont(30, weight: .semibold)
-                            .foregroundColor(FlowPalette.text)
-                        Text("把流程变成可执行的步骤")
-                            .flowFont(13)
-                            .foregroundColor(FlowPalette.secondaryText)
-                    }
-                    Spacer()
-                    Button("＋ 新建") { create() }
-                        .flowFont(14, weight: .medium)
-                        .foregroundColor(.white)
-                        .frame(width: 92, height: 44)
-                        .background(FlowPalette.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("home-new")
-                }
-                .padding(.top, 8)
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .flowFont(13)
-                        .foregroundColor(FlowPalette.invalid)
-                        .padding(.top, 12)
-                }
-
-                HStack {
-                    Text("我的流程")
-                        .flowFont(20, weight: .semibold)
+        ZStack {
+            FlowLightArt(mode: .home)
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    FlowBoltMark(size: 22)
+                    Text("Flow")
+                        .flowFont(24, weight: .semibold)
                         .foregroundColor(FlowPalette.text)
                     Spacer()
-                    Text("\(plans.count) 个流程")
-                        .flowFont(13)
-                        .foregroundColor(FlowPalette.secondaryText)
                 }
-                .padding(.top, 34)
+                .padding(.horizontal, FlowMetrics.pagePadding)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
 
-                if plans.isEmpty {
-                    emptyState
-                        .padding(.top, 14)
-                } else {
-                    VStack(spacing: 14) {
-                        ForEach(plans) { plan in
-                            planCard(plan)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("让执行更简单")
+                            .flowFont(28, weight: .semibold)
+                            .foregroundColor(FlowPalette.text)
+                            .padding(.top, 20)
+                        Text("专注当下，完成每一个步骤")
+                            .flowFont(13)
+                            .foregroundColor(FlowPalette.secondaryText)
+                            .padding(.top, 5)
+
+                        createButton
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 22)
+
+                        HStack {
+                            Text("我的流程")
+                                .flowFont(18, weight: .semibold)
+                                .foregroundColor(FlowPalette.text)
+                            Spacer()
+                            Text("\(plans.count) 个流程")
+                                .flowFont(11.5)
+                                .foregroundColor(FlowPalette.secondaryText)
                         }
-                    }
-                    .padding(.top, 14)
-                }
+                        .padding(.top, 29)
+                        .padding(.bottom, 12)
 
-                Spacer(minLength: 24)
+                        if let errorMessage {
+                            Text(errorMessage)
+                                .flowFont(12)
+                                .foregroundColor(FlowPalette.invalid)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(FlowPalette.dangerSoft)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .padding(.bottom, 12)
+                        }
+
+                        if plans.isEmpty {
+                            emptyState
+                                .padding(.top, 34)
+                        } else {
+                            VStack(spacing: 12) {
+                                ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
+                                    planCard(plan, index: index)
+                                }
+                            }
+                        }
+
+                        Spacer(minLength: 28)
+                    }
+                    .padding(.horizontal, FlowMetrics.pagePadding)
+                    .padding(.bottom, 24)
+                }
+                .scrollIndicators(.hidden)
             }
-            .padding(.horizontal, FlowMetrics.pagePadding)
-            .padding(.bottom, 20)
         }
-        .scrollIndicators(.hidden)
+    }
+
+    private var createButton: some View {
+        Button(action: create) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("创建流程")
+                    .flowFont(15, weight: .semibold)
+            }
+            .foregroundColor(.white)
+            .frame(width: 212, height: 48)
+            .background(
+                LinearGradient(
+                    colors: [Color(red: 0.31, green: 0.55, blue: 1.0), Color(red: 0.18, green: 0.42, blue: 1.0)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .clipShape(Capsule())
+            .shadow(color: FlowPalette.primary.opacity(0.28), radius: 12, x: 0, y: 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home-new")
     }
 
     private var emptyState: some View {
-        FlowCard(padding: 24) {
-            VStack(spacing: 0) {
-                FlowGraphic()
-                Text("还没有流程")
-                    .flowFont(18, weight: .semibold)
-                    .foregroundColor(FlowPalette.text)
-                    .padding(.top, 18)
-                Text("创建一套流程，让每一步都有明确安排。")
-                    .flowFont(13)
-                    .foregroundColor(FlowPalette.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 6)
-                Button("创建第一个流程") { create() }
-                    .flowFont(14, weight: .medium)
-                    .foregroundColor(.white)
-                    .frame(height: 46)
-                    .padding(.horizontal, 18)
-                    .background(FlowPalette.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .buttonStyle(.plain)
-                    .padding(.top, 18)
-                    .accessibilityIdentifier("home-empty-new")
-            }
-            .frame(maxWidth: .infinity)
+        VStack(spacing: 0) {
+            FlowPlanIconTile(icon: .flow, size: 52)
+            Text("还没有流程")
+                .flowFont(18, weight: .semibold)
+                .foregroundColor(FlowPalette.text)
+                .padding(.top, 18)
+            Text("把每天要做的事，编成一条清晰的流程。")
+                .flowFont(13)
+                .foregroundColor(FlowPalette.secondaryText)
+                .multilineTextAlignment(.center)
+                .padding(.top, 7)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    private func planCard(_ plan: Routine) -> some View {
-        FlowCard(padding: 18) {
-            Button {
-                guard !runCoordinator.isActive else { return }
-                editing = plan
-            } label: {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(plan.name)
-                        .flowFont(18, weight: .semibold)
-                        .foregroundColor(FlowPalette.text)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Text("\(plan.steps.count) 个节点")
-                        .flowFont(13)
-                        .foregroundColor(FlowPalette.secondaryText)
-                        .padding(.top, 5)
-
-                    if !plan.steps.isEmpty {
-                        VStack(spacing: 0) {
-                            ForEach(Array(plan.steps.prefix(3).enumerated()), id: \.element.id) { index, step in
-                                PlanTimelineRow(
-                                    step: step,
-                                    index: index,
-                                    isLast: index == plan.steps.prefix(3).count - 1
-                                )
+    private func planCard(_ plan: Routine, index: Int) -> some View {
+        let icon: FlowPlanIcon = index % 3 == 0 ? .sun : (index % 3 == 1 ? .target : .flow)
+        return Button {
+            openSetup(plan)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    FlowPlanIconTile(icon: icon, size: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(plan.name)
+                            .flowFont(16, weight: .semibold)
+                            .foregroundColor(FlowPalette.text)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        HStack(spacing: 6) {
+                            Text("\(plan.steps.count) 个节点")
+                                .flowFont(11.5)
+                                .foregroundColor(FlowPalette.secondaryText)
+                            if let duration = flowPlanDurationLabel(steps: plan.steps) {
+                                Circle()
+                                    .fill(FlowPalette.outlineStrong)
+                                    .frame(width: 3, height: 3)
+                                Text(duration)
+                                    .flowFont(11.5)
+                                    .foregroundColor(FlowPalette.secondaryText)
                             }
                         }
-                        .padding(.top, 14)
+                    }
+                    Spacer(minLength: 8)
+                    FlowChevron(size: 14, color: Color(red: 0.65, green: 0.70, blue: 0.77))
+                }
+
+                if !plan.steps.isEmpty {
+                    VStack(spacing: 0) {
+                        let preview = Array(plan.steps.prefix(3))
+                        ForEach(Array(preview.enumerated()), id: \.element.id) { rowIndex, step in
+                            HomeTimelineRow(
+                                step: step,
+                                index: rowIndex,
+                                isFirst: rowIndex == 0,
+                                isLast: rowIndex == preview.count - 1
+                            )
+                        }
                         if plan.steps.count > 3 {
-                            Text("还有 \(plan.steps.count - 3) 个节点")
-                                .flowFont(12)
-                                .foregroundColor(FlowPalette.secondaryText)
-                                .padding(.top, 6)
+                            HomeMoreRow(count: plan.steps.count - 3)
                         }
                     }
+                    .padding(.top, 9)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-
-            HStack(spacing: 10) {
-                Button("开始") {
-                    openSetup(plan)
-                }
-                .flowFont(14, weight: .medium)
-                .foregroundColor(plan.steps.isEmpty ? FlowPalette.secondaryText : .white)
-                .frame(width: 84, height: 44)
-                .background(plan.steps.isEmpty ? FlowPalette.segmentBackground : FlowPalette.primary)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .buttonStyle(.plain)
-                .disabled(plan.steps.isEmpty)
-                .accessibilityIdentifier("plan-start")
-
-                Button("编辑") {
-                    guard !runCoordinator.isActive else { return }
-                    editing = plan
-                }
-                .flowFont(14)
-                .foregroundColor(FlowPalette.primary)
-                .buttonStyle(.plain)
-                .padding(.horizontal, 4)
-
-                Spacer()
-
-                Menu {
-                    Button("删除", role: .destructive) {
-                        planPendingDeletion = plan
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .flowFont(18, weight: .medium)
-                        .foregroundColor(FlowPalette.secondaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityIdentifier("plan-more")
-            }
-            .padding(.top, 18)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(FlowPalette.surface)
+            .clipShape(RoundedRectangle(cornerRadius: FlowMetrics.cardRadius, style: .continuous))
+            .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 6)
         }
-    }
-
-    private func compactTarget(_ step: RoutineStep) -> String {
-        switch step.type {
-        case .count:
-            return "\(step.target ?? 0) 次"
-        case .timer:
-            return formatRunCountdown(step.durationMs)
-        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("plan-start")
     }
 
     private func openSetup(_ plan: Routine) {
@@ -265,6 +284,7 @@ struct PlanHomeView: View {
     private func start(_ plan: Routine) -> String? {
         switch runCoordinator.start(plan: plan) {
         case .started:
+            lastRunPlan = plan
             setupPlan = nil
             setupMessage = nil
             return nil
@@ -305,69 +325,88 @@ struct PlanHomeView: View {
     }
 }
 
-
-private struct FlowGraphic: View {
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(FlowPalette.accentSoft)
-                .frame(width: 72, height: 72)
-            VStack(spacing: 0) {
-                Circle().fill(FlowPalette.primary).frame(width: 7, height: 7)
-                Rectangle().fill(FlowPalette.primary.opacity(0.30)).frame(width: 1, height: 8)
-                Circle().fill(FlowPalette.primary).frame(width: 7, height: 7)
-                Rectangle().fill(FlowPalette.primary.opacity(0.30)).frame(width: 1, height: 8)
-                Circle().fill(FlowPalette.primary).frame(width: 7, height: 7)
-            }
-        }
-    }
-}
-
-private struct PlanTimelineRow: View {
+private struct HomeTimelineRow: View {
     let step: RoutineStep
     let index: Int
+    let isFirst: Bool
     let isLast: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             ZStack {
-                if index > 0 {
+                if !isFirst {
                     Rectangle()
-                        .fill(FlowPalette.connector)
-                        .frame(width: 1, height: 19)
+                        .fill(FlowPalette.primary.opacity(0.24))
+                        .frame(width: 1.5, height: 14)
                         .frame(maxHeight: .infinity, alignment: .top)
                 }
                 if !isLast {
                     Rectangle()
-                        .fill(FlowPalette.connector)
-                        .frame(width: 1, height: 19)
+                        .fill(FlowPalette.primary.opacity(0.24))
+                        .frame(width: 1.5, height: 14)
                         .frame(maxHeight: .infinity, alignment: .bottom)
                 }
-                Circle()
-                    .fill(step.type == .count ? FlowPalette.primary : FlowPalette.dirty)
-                    .frame(width: 8, height: 8)
+                Text("\(index + 1)")
+                    .flowFont(9.5, weight: .semibold)
+                    .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
+                    .background(FlowPalette.primary)
+                    .clipShape(Circle())
             }
-            .frame(width: 16, height: 38)
+            .frame(width: 21, height: 28)
 
             Text(step.name)
-                .flowFont(15)
-                .foregroundColor(FlowPalette.text)
+                .flowFont(12.5)
+                .foregroundColor(Color(red: 0.20, green: 0.25, blue: 0.33))
                 .lineLimit(1)
-            Spacer()
-            Text(compactTarget(step))
-                .flowFont(13)
-                .foregroundColor(FlowPalette.secondaryText)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 4) {
+                FlowTypeGlyph(type: step.type, size: 11)
+                Text(target)
+                    .flowFont(10.5)
+                    .foregroundColor(Color(red: 0.54, green: 0.60, blue: 0.67))
+            }
         }
-        .frame(height: 38)
+        .frame(height: 28)
     }
 
-    private func compactTarget(_ step: RoutineStep) -> String {
-        switch step.type {
-        case .count:
+    private var target: String {
+        if step.type == .count {
             return "\(step.target ?? 0) 次"
-        case .timer:
-            return formatRunCountdown(step.durationMs)
         }
+        return formatRunDuration(step.durationMs)
+    }
+}
+
+private struct HomeMoreRow: View {
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Canvas { context, size in
+                var path = Path()
+                path.move(to: CGPoint(x: size.width / 2, y: 0))
+                path.addLine(to: CGPoint(x: size.width / 2, y: 12))
+                context.stroke(
+                    path,
+                    with: .color(FlowPalette.primary.opacity(0.24)),
+                    style: StrokeStyle(lineWidth: 1.5, dash: [2.5, 3])
+                )
+                context.fill(
+                    Path(ellipseIn: CGRect(x: size.width / 2 - 2, y: 13, width: 4, height: 4)),
+                    with: .color(Color(red: 0.65, green: 0.70, blue: 0.77))
+                )
+            }
+            .frame(width: 21, height: 21)
+
+            Text("还有 \(count) 个节点...")
+                .flowFont(10.5)
+                .foregroundColor(FlowPalette.secondaryText)
+            Spacer(minLength: 0)
+        }
+        .frame(height: 21)
     }
 }
 

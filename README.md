@@ -1,18 +1,18 @@
 # Flow
 
-Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。当前版本为 0.1.0，已完成计划创建/编辑/持久化、双端计划运行闭环、TIMER 自动倒计时、单节点循环、退出/结束反馈，以及 Android 前台服务通知与 iOS 本地通知。
+Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。Android 当前版本为 0.1.1；iOS 源码仍为 0.1.0，本次未发布 iOS 安装包。已完成计划创建/编辑/持久化、双端计划运行闭环、TIMER 自动倒计时、单节点循环、退出/结束反馈，以及 Android 前台服务通知与 iOS 本地通知。
 
 ## 已确定配置
 - Android：Kotlin + Jetpack Compose，最低 Android 10 / API 29；当前 `compileSdk/targetSdk = 33`，包名 `com.flow.app`
 - iOS：Swift + SwiftUI，最低 iOS 16；Bundle Identifier `com.flow.app`
-- UI：轻量、克制的现代工具风；统一设计 Token 与双端页面体系，详见 [UI 设计体系](docs/UI_DESIGN_SYSTEM.md)。
+- UI：reference v2 插画背景与统一设计 Token；Android 0.1.1 已完成首页、准备页、COUNT/TIMER、完成页视觉改造。
 - 首版本地优先，无账号、无服务端。
 
-## 0.1.0 状态
+## 0.1.1 状态
 
-- Android 0.1.0 Release APK 已构建，并已通过 v2 签名验证；已完成真机安装与人工测试。
-- Android 包名 `com.flow.app`，versionCode `1`，versionName `0.1.0`，minSdk 29。
-- iOS 0.1.0 源码、单元测试和 UI 测试已进入发布范围；iOS 真机签名发布仍未执行。
+- Android 0.1.1 Release APK 随本次 v0.1.1 GitHub Release 提供，使用既有正式签名材料构建。
+- Android 包名 `com.flow.app`，versionCode `2`，versionName `0.1.1`，minSdk 29。
+- iOS 源码仍为 0.1.0 范围；本次不发布 iOS 安装包。
 - Release APK 和本地验收截图/记录不进入源码提交，由 GitHub Release 附件或本地归档单独管理。
 - Android Release 签名配置见 [Android Release 签名配置](docs/ANDROID_RELEASE_SIGNING.md)。
 
@@ -106,7 +106,7 @@ Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流�
 - iOS 本地通知预约/取消/重排、授权拒绝降级、陈旧通知清理
 - 双端运行控制器/协调器/通知调度单元测试；iOS 端到端 UI 测试
 
-仍未实现（明确不在 0.1.0 范围）：
+仍未实现（明确不在当前发布范围）：
 
 - iOS 真机签名发布与真机触觉/后台调度验收；Android 已完成真机安装与人工测试
 - 执行历史展示
@@ -116,5 +116,5 @@ Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流�
 ## 验证证据
 
 - 验证截图和测试记录保留在本地 `artifacts/`，按发布规范不作为源码提交。
-- Android：JVM 单元测试 + 模拟器人工走查 + Release APK 真机安装/人工测试。
+- Android：JVM 单元测试 + 模拟器人工走查 + Release APK 安装/启动检查。
 - iOS：XCTest 单元测试 + XCUITest 端到端 UI 测试（模拟器）。

@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.flow.app.domain.model.StepType
 
 @Composable
@@ -68,7 +69,7 @@ fun FlowPrimaryButton(
             disabledContentColor = FlowSecondaryText
         )
     ) {
-        Text(text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -97,17 +98,17 @@ fun FlowSecondaryButton(
 @Composable
 fun FlowTypeBadge(type: StepType) {
     val label = if (type == StepType.COUNT) "COUNT" else "TIMER"
-    val color = if (type == StepType.COUNT) FlowPrimary else FlowWarning
+    val color = if (type == StepType.COUNT) FlowPrimary else FlowWarmInk
     Box(
         modifier = Modifier
-            .height(28.dp)
-            .background(color.copy(alpha = 0.10f), RoundedCornerShape(8.dp))
+            .height(24.dp)
+            .background(color.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
             color = color
         )

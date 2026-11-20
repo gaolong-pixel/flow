@@ -61,4 +61,55 @@ class RunFormattingTest {
         assertEquals("待开始", nodeStateLabel(NodeRunState.READY))
         assertEquals("已到期", nodeStateLabel(NodeRunState.EXPIRED))
     }
+
+    @Test
+    fun overallProgressUsesCompletedNodesOnly() {
+        assertEquals(0f, flowOverallProgress(0, 5), 0.0001f)
+        assertEquals(0.5f, flowOverallProgress(2, 4), 0.0001f)
+        assertEquals(1f, flowOverallProgress(4, 4), 0.0001f)
+        assertEquals(0f, flowOverallProgress(0, 0), 0.0001f)
+        assertEquals(40, flowOverallPercent(2, 5))
+    }
+
+    @Test
+    fun timerRemainingFractionIsClampedForDrawing() {
+        assertEquals(1f, flowTimerRemainingFraction(120_000L, 120_000L), 0.0001f)
+        assertEquals(0.5f, flowTimerRemainingFraction(120_000L, 60_000L), 0.0001f)
+        assertEquals(0f, flowTimerRemainingFraction(120_000L, 0L), 0.0001f)
+        assertEquals(1f, flowTimerRemainingFraction(120_000L, 180_000L), 0.0001f)
+        assertEquals(0f, flowTimerRemainingFraction(null, 10_000L), 0.0001f)
+    }
+
+    @Test
+    fun planDurationLabelNeverInventsAnEstimate() {
+        val count = RoutineStep(
+            id = "c",
+            name = "俯卧撑",
+            type = StepType.COUNT,
+            target = 10,
+            countMode = CountMode.COMPLETE
+        )
+        val timer = RoutineStep(
+            id = "t",
+            name = "阅读",
+            type = StepType.TIMER,
+            durationMs = 300_000L,
+            category = TimerCategory.NORMAL
+        )
+        assertEquals(null, flowPlanDurationLabel(listOf(count)))
+        assertEquals(null, flowPlanDurationLabel(emptyList()))
+        assertEquals("预计 5 分钟", flowPlanDurationLabel(listOf(timer)))
+        assertEquals("计时 5 分钟", flowPlanDurationLabel(listOf(count, timer)))
+        assertEquals(300_000L, flowPlanTimerTotalMs(listOf(count, timer)))
+    }
+
+    @Test
+    fun giantNumbersShrinkForLongValuesAndLargeFontScales() {
+        val normal = flowDisplayNumberSizeSp(104f, 2, 1f)
+        val long = flowDisplayNumberSizeSp(104f, 5, 1f)
+        val largeType = flowDisplayNumberSizeSp(104f, 2, 2f)
+        assert(normal > long)
+        assert(normal >= largeType)
+        assert(long >= 30f)
+    }
 }
