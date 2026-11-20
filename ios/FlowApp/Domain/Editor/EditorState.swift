@@ -41,6 +41,8 @@ enum EditorError: String, Error, Equatable {
     case stepNotFound = "STEP_NOT_FOUND"
     case invalidMove = "INVALID_MOVE"
     case invalidRepeatCount = "INVALID_REPEAT_COUNT"
+    case invalidName = "INVALID_NAME"
+    case nameTooLong = "NAME_TOO_LONG"
     case serializationFailed = "SERIALIZATION_FAILED"
 }
 

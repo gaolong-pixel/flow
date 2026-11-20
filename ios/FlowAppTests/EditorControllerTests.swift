@@ -763,6 +763,86 @@ final class EditorControllerTests: XCTestCase {
         XCTAssertEqual(controller.state.mode, .text)
     }
 
+    func testRenameTrimsNameAndKeepsPlanAndStepIdentity() throws {
+        let controller = try EditorController(
+            initialDraft: makeDraft(
+                countStep("a", "Push-ups", 15),
+                timerStep("b", "Read", 60_000)
+            )
+        )
+        let before = controller.state.draft
+
+        let renamed = requireSuccess(controller.rename("  Morning Flow  "))
+
+        XCTAssertEqual(renamed.draft.name, "Morning Flow")
+        XCTAssertEqual(renamed.draft.id, "draft")
+        XCTAssertEqual(renamed.draft.steps, before.steps)
+        XCTAssertEqual(renamed.draft.steps.map(\.id), ["a", "b"])
+        XCTAssertEqual(try renamed.draft.toRoutine().name, "Morning Flow")
+    }
+
+    func testRenameRejectsBlankNameWithoutChangingDraft() throws {
+        let controller = try EditorController(
+            initialDraft: makeDraft(countStep("a", "Push-ups", 15))
+        )
+        let before = controller.state.draft
+
+        let result = controller.rename(" \u{00A0} ")
+
+        XCTAssertEqual(requireFailure(result), .invalidName)
+        XCTAssertEqual(controller.state.draft, before)
+    }
+
+    func testRenameRejectsOverlongName() throws {
+        let controller = try EditorController(
+            initialDraft: makeDraft(countStep("a", "Push-ups", 15))
+        )
+        let before = controller.state.draft
+
+        let result = controller.rename(
+            String(repeating: "a", count: EditorController.maxNameLength + 1)
+        )
+
+        XCTAssertEqual(requireFailure(result), .nameTooLong)
+        XCTAssertEqual(controller.state.draft, before)
+    }
+
+    func testRenameThenCommitTextPersistsNameWithNewSteps() throws {
+        let controller = try EditorController(
+            initialDraft: makeDraft(
+                countStep("a", "Push-ups", 15),
+                timerStep("b", "Read", 60_000)
+            )
+        )
+
+        _ = requireSuccess(controller.rename("  Renamed  "))
+        controller.onTextChanged("Push-ups 20次\nRead 1分钟")
+        let committed = requireSuccess(controller.commitText())
+
+        XCTAssertEqual(committed.draft.name, "Renamed")
+        XCTAssertEqual(committed.draft.steps[0].target, 20)
+        XCTAssertEqual(committed.draft.steps[0].id, "a")
+        XCTAssertEqual(committed.draft.steps[1].id, "b")
+        XCTAssertEqual(try committed.draft.toRoutine().name, "Renamed")
+    }
+
+    func testRenameInCardsModePreservesStepIDsAndOrder() throws {
+        let controller = try EditorController(
+            initialDraft: makeDraft(
+                countStep("a", "Push-ups", 15),
+                timerStep("b", "Read", 60_000)
+            )
+        )
+        _ = requireSuccess(controller.switchMode(.cards))
+
+        let renamed = requireSuccess(controller.rename("Evening Flow"))
+
+        XCTAssertEqual(renamed.draft.name, "Evening Flow")
+        XCTAssertEqual(renamed.draft.steps.map(\.id), ["a", "b"])
+        XCTAssertEqual(renamed.draft.steps.map(\.name), ["Push-ups", "Read"])
+        XCTAssertEqual(renamed.mode, .cards)
+    }
+
     private func makeDraft(_ steps: RoutineStep...) throws -> RoutineDraft {
         try RoutineDraft(
             id: "draft",

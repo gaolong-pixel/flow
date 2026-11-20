@@ -35,6 +35,20 @@
                ReferencedContainer = "container:Flow.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F20000000000000000000001"
+               BuildableName = "FlowUITests.xctest"
+               BlueprintName = "FlowUITests"
+               ReferencedContainer = "container:Flow.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,6 +75,17 @@
                BlueprintIdentifier = "60E39D864D8F99277AEBCA03"
                BuildableName = "FlowTests.xctest"
                BlueprintName = "FlowTests"
+               ReferencedContainer = "container:Flow.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F20000000000000000000001"
+               BuildableName = "FlowUITests.xctest"
+               BlueprintName = "FlowUITests"
                ReferencedContainer = "container:Flow.xcodeproj">
             </BuildableReference>
          </TestableReference>

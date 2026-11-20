@@ -99,6 +99,8 @@ enum class EditorError {
     STEP_NOT_FOUND,
     INVALID_MOVE,
     INVALID_REPEAT_COUNT,
+    INVALID_NAME,
+    NAME_TOO_LONG,
     SERIALIZATION_FAILED
 }
 

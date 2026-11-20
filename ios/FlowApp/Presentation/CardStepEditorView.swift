@@ -70,39 +70,24 @@ struct CardStepEditorView: View {
                         TextField("目标次数", text: $form.target)
                             .keyboardType(.numberPad)
 
-                        Picker("计数模式", selection: $form.countMode) {
-                            Text("逐次计数").tag(CountMode.increment)
-                            Text("整组完成").tag(CountMode.complete)
-                        }
-                        .pickerStyle(.segmented)
                     }
                 } else {
                     Section("计时设置") {
                         TextField("计时时长（秒）", text: $form.durationSeconds)
                             .keyboardType(.numberPad)
 
-                        Picker("计时分类", selection: $form.category) {
-                            Text("普通计时").tag(TimerCategory.normal)
-                            Text("休息").tag(TimerCategory.rest)
-                        }
-                        .pickerStyle(.segmented)
                     }
-                }
-
-                Section("重复设置") {
-                    TextField("步骤重复次数", text: $form.repeatCount)
-                        .keyboardType(.numberPad)
                 }
 
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
-                            .font(.system(size: 13))
+                            .flowFont(13)
                             .foregroundColor(FlowPalette.invalid)
                     }
                 }
             }
-            .navigationTitle(initial.editingID == nil ? "添加步骤" : "编辑步骤")
+            .navigationTitle(initial.editingID == nil ? "添加节点" : "编辑节点")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -132,6 +117,7 @@ struct CardStepEditorView: View {
             .onChange(of: form.countMode) { _ in errorMessage = nil }
             .onChange(of: form.category) { _ in errorMessage = nil }
         }
+        .tint(FlowPalette.primary)
         .preferredColorScheme(.light)
         .presentationDetents([.medium, .large])
     }

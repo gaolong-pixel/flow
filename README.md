@@ -1,20 +1,47 @@
 # Flow
 
-Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。当前已实现流程编辑（文本/卡片）、解析与序列化、稳定步骤 ID、执行引擎与阶段七双端回归；执行 UI、持久化和后台恢复仍属于后续阶段。
+Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。当前版本为 0.1.0，已完成计划创建/编辑/持久化、双端计划运行闭环、TIMER 自动倒计时、单节点循环、退出/结束反馈，以及 Android 前台服务通知与 iOS 本地通知。
 
 ## 已确定配置
 - Android：Kotlin + Jetpack Compose，最低 Android 10 / API 29；当前 `compileSdk/targetSdk = 33`，包名 `com.flow.app`
 - iOS：Swift + SwiftUI，最低 iOS 16；Bundle Identifier `com.flow.app`
-- UI：现代卡片风；编辑界面已接入，执行界面仍待后续阶段。
-- 首版本地优先，无账号、无服务端
+- UI：轻量、克制的现代工具风；统一设计 Token 与双端页面体系，详见 [UI 设计体系](docs/UI_DESIGN_SYSTEM.md)。
+- 首版本地优先，无账号、无服务端。
+
+## 0.1.0 状态
+
+- Android 0.1.0 Release APK 已构建，并已通过 v2 签名验证；已完成真机安装与人工测试。
+- Android 包名 `com.flow.app`，versionCode `1`，versionName `0.1.0`，minSdk 29。
+- iOS 0.1.0 源码、单元测试和 UI 测试已进入发布范围；iOS 真机签名发布仍未执行。
+- Release APK 和本地验收截图/记录不进入源码提交，由 GitHub Release 附件或本地归档单独管理。
+- Android Release 签名配置见 [Android Release 签名配置](docs/ANDROID_RELEASE_SIGNING.md)。
 
 ## 工程状态
 
-当前处于阶段七执行引擎收尾。执行引擎已完成并通过双端测试；产品尚未完成执行 UI、持久化、后台恢复和历史展示，不是完整可发布应用。
+第二阶段运行功能已双端完成：
+
+- 计划持久化：Android/iOS 均保存到应用内部 `plans.json`，只保存计划定义。
+- 运行实例：[`PlanRunController`](android/app/src/main/kotlin/com/flow/app/domain/run/PlanRunController.kt) / [`PlanRunController.swift`](ios/FlowApp/Domain/Run/PlanRunController.swift) 为纯内存状态机；[`RunCoordinator`](android/app/src/main/kotlin/com/flow/app/domain/run/RunCoordinator.kt) / [`RunCoordinator.swift`](ios/FlowApp/Domain/Run/RunCoordinator.swift) 由 App 进程持有，保证同一时间只有一个运行实例。
+- 运行状态不写入 PlanStore，无崩溃恢复，无执行历史。
+- Android 后台：前台服务 + 两个通知渠道（运行状态、计时提醒），详见 [第二阶段运行功能](docs/RUN_FEATURE.md)。
+- iOS 后台：仅使用本地通知；App 回到前台后按单调时钟重新计算剩余时间。
+- 阶段七旧执行引擎（ExecutionSession/Scheduler/records 等）已移除；计划模型和文本编辑契约保持不变，历史 `x N`、`[计数=完成]`、`[分类=休息]` 语法继续被解析器接受作为兼容输入，但计划 JSON 只保存目标次数/时长。
 
 - Android 工程根目录：`android/`；Gradle Wrapper 7.6.1，AGP 7.4.2，Kotlin 1.8.22，Compose BOM 2023.06.01。
 - iOS 工程：`ios/Flow.xcodeproj`；Xcode 工程文件由 `ios/project.yml` 生成，部署目标 iOS 16.0。
-- 旧 Phase 1 V0 原型代码保留用于参考：`android/app/src/main/java/com/example/flow/` 与 `ios/Flow/`，**不参与新 App 编译**。这些文件中的 REST 名称推断等逻辑尚未接入运行应用。
+- 旧 Phase 1 V0 原型代码保留用于参考：`android/app/src/main/java/com/example/flow/` 与 `ios/Flow/`，**不参与新 App 编译**。
+
+## 计划运行（第二阶段）
+
+1. 在计划列表创建计划并编辑 COUNT/TIMER 节点，保存。
+2. 点击计划卡片上的“开始”进入启动设置；运行始终按节点顺序开始，单节点循环只在运行页控制（默认关闭）。
+3. 运行页支持：COUNT 开始/完成；TIMER 真实倒计时、暂停、继续、到期、提前完成。
+4. 运行期间可随时开关“当前节点循环”。循环完成后重置当前节点且不计入完成节点数；关闭循环本身不推进节点。
+5. 编辑页顶部可填写/修改流程名称；名称随保存与节点一起持久化，空名称不可保存。
+6. 主动退出会展示“已退出流程”和已完成节点数；全部节点完成后展示“流程已完成”结果页；两者都可返回首页。
+7. 运行期间不能编辑计划，也不能启动第二个计划。
+
+产品语义见 [RUN_FEATURE.md](docs/RUN_FEATURE.md)，计划模型见 [PLAN_MODEL_V1.md](docs/PLAN_MODEL_V1.md)。
 
 ## Android
 
@@ -22,6 +49,9 @@ Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流�
 2. 确认 SDK 已安装 Android 13 / API 33（Build-Tools 33.0.2）；如 IDE 提示，设置本地 SDK 路径。
 3. 选择 `app` 运行配置，启动模拟器或设备。
 4. 命令行构建：`cd android && ./gradlew :app:assembleDebug`。
+5. 单元测试：`cd android && ./gradlew :app:testDebugUnitTest`。
+
+运行会启动前台服务；Android 13+ 首次进入启动设置时会请求通知权限。拒绝通知权限不影响前台计时，但后台到期提醒会被系统隐藏。
 
 ## iOS
 
@@ -29,7 +59,11 @@ Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流�
 2. Scheme 选择 `Flow`，运行目标选择 iOS 16+ 模拟器。
 3. 命令行构建：
    `xcodebuild -project ios/Flow.xcodeproj -scheme Flow -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/flow-ios-derived CODE_SIGNING_ALLOWED=NO build`
-4. 真机运行需要在 Xcode 中设置自己的 Development Team；模拟器不需要签名。
+4. 单元测试 / UI 测试：
+   `xcodebuild -project ios/Flow.xcodeproj -scheme Flow -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath /tmp/flow-ios-derived CODE_SIGNING_ALLOWED=NO test`
+5. 真机运行需要在 Xcode 中设置自己的 Development Team；模拟器不需要签名。
+
+首次运行会请求本地通知权限；拒绝后前台计时仍正常，只是没有后台到期提醒。iOS 不申请永久后台运行，进程被杀后已提交给系统的本地通知仍可能触发，重新启动 App 时会清理陈旧的 Flow 运行通知。
 
 ## 文本语法 V1.1
 
@@ -59,25 +93,28 @@ Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流�
 - 文字与卡片语义无损，不要求保留原始空格/单位写法；无法表示的步骤（MANUAL、非整秒时长等）必须阻止序列化。
 - 卡片修改 COUNT/TIMER 类型时保留步骤 ID；文本模式无法可靠匹配类型变更时允许新 ID。
 - V1.1 不支持 MANUAL；解析、序列化、校验、保存均拒绝。
-- 阶段七执行引擎已完成；执行 UI、持久化和后台恢复属于后续阶段。
 
 ## 当前状态
 
 已实现：
 
 - V1.1 文本解析、序列化、双向编辑状态与稳定步骤 ID
-- Routine / RoutineStep 领域模型与校验
-- Android/iOS 执行引擎：ExecutionSession、Scheduler、Controller、TimerEngine
-- COUNT INCREMENT / COMPLETE、SKIP、TIMER 生命周期、PAUSE/RESUME/CANCEL
-- Timer Plan/Commit、ActiveTimerReference、并发保护与失败原子性
-- 阶段七双端执行引擎回归测试
+- Routine / RoutineStep 领域模型与校验、双端 `plans.json` 持久化
+- 双端计划运行闭环：启动设置、COUNT、TIMER、暂停/继续/到期/提前完成、单节点循环、退出与正常结束
+- 运行实例 App 级单例保护；运行状态不持久化；进程重启无旧运行实例
+- Android 前台服务、通知渠道、通知权限、后台到期提醒、暂停/完成/退出通知更新
+- iOS 本地通知预约/取消/重排、授权拒绝降级、陈旧通知清理
+- 双端运行控制器/协调器/通知调度单元测试；iOS 端到端 UI 测试
 
-仍未实现：
+仍未实现（明确不在 0.1.0 范围）：
 
-- 执行 UI 接入与真实设备交互验收
-- Room/SQLite 持久化、进程重启恢复
-- 后台/锁屏计时恢复、通知
+- iOS 真机签名发布与真机触觉/后台调度验收；Android 已完成真机安装与人工测试
 - 执行历史展示
-- 卡片拖拽排序 UI（卡片字段编辑已实现）
+- 崩溃恢复、后台长期计时（iOS 不做永久后台）
+- 卡片拖拽排序（节点顺序通过上移/下移调整）
 
-当前处于阶段七执行引擎收尾，尚未形成完整可发布产品。
+## 验证证据
+
+- 验证截图和测试记录保留在本地 `artifacts/`，按发布规范不作为源码提交。
+- Android：JVM 单元测试 + 模拟器人工走查 + Release APK 真机安装/人工测试。
+- iOS：XCTest 单元测试 + XCUITest 端到端 UI 测试（模拟器）。

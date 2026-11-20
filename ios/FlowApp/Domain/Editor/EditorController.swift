@@ -101,6 +101,36 @@ final class EditorController {
         }
     }
 
+    /// Renames the routine without touching step IDs, order or step fields.
+    /// The text buffer is left untouched because the name is not part of the
+    /// step text syntax; the updated draft name is carried into persistence.
+    func rename(_ newName: String) -> EditorResult {
+        let trimmed = newName.trimmingFlowWhitespace
+        guard !trimmed.isEmpty else {
+            return .failure(.invalidName, state)
+        }
+        guard trimmed.count <= Self.maxNameLength else {
+            return .failure(.nameTooLong, state)
+        }
+        guard trimmed != state.draft.name else {
+            return .success(state)
+        }
+
+        let renamed = state.draft.renaming(trimmed)
+        state = EditorState(
+            mode: state.mode,
+            draft: renamed,
+            textBuffer: state.textBuffer,
+            parseResult: state.parseResult,
+            syncStatus: state.syncStatus,
+            lastCommittedSteps: state.lastCommittedSteps,
+            lastCommittedText: state.lastCommittedText
+        )
+        return .success(state)
+    }
+
+    static let maxNameLength = 60
+
     func addStep(_ candidate: StepCandidate) -> EditorResult {
         cardOperation {
             try state.draft.addingStep(

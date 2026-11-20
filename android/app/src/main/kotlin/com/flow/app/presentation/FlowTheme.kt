@@ -5,18 +5,45 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
-val FlowBackground = Color(0xFFF7F6F2)
-val FlowSurface = Color(0xFFFFFFFF)
-val FlowPrimary = Color(0xFF2F6B5F)
-val FlowPrimarySoft = Color(0xFFE5F0EB)
-val FlowText = Color(0xFF1E231F)
-val FlowSecondaryText = Color(0xFF6C736D)
-val FlowOutline = Color(0xFFE4E1D9)
-val FlowSegmentBackground = Color(0xFFEDEBE4)
-val FlowSynced = Color(0xFF2D6B57)
-val FlowDirty = Color(0xFF946200)
-val FlowInvalid = Color(0xFFB3261E)
+// Flow design tokens — light theme is the product baseline.
+val FlowBackground = Color(0xFFF5F7FA)   // Background
+val FlowSurface = Color(0xFFFFFFFF)       // Surface
+val FlowText = Color(0xFF172033)          // Primary
+val FlowSecondaryText = Color(0xFF7B8495) // Secondary
+val FlowPrimary = Color(0xFF356AE6)       // Accent
+val FlowPrimarySoft = Color(0xFFEAF0FF)   // AccentSoft
+val FlowOutline = Color(0xFFE5E9F0)       // Border
+val FlowSegmentBackground = Color(0xFFE9EDF3)
+val FlowSynced = Color(0xFF21865B)        // Success
+val FlowDirty = Color(0xFFD58A2A)         // Warning
+val FlowInvalid = Color(0xFFD94B4B)       // Danger
+val FlowSuccess = FlowSynced
+val FlowWarning = FlowDirty
+val FlowDanger = FlowInvalid
+val FlowSuccessSoft = Color(0xFFE8F5EE)
+val FlowWarningSoft = Color(0xFFFFF4E5)
+val FlowDangerSoft = Color(0xFFFDEEEE)
+val FlowAccent = FlowPrimary
+val FlowAccentSoft = FlowPrimarySoft
+val FlowBorder = FlowOutline
+val FlowConnector = Color(0xFFDCE3EF)
+
+object FlowSpacing {
+    val page = 22.dp
+    val card = 18.dp
+    val gap = 14.dp
+    val small = 8.dp
+    val section = 24.dp
+}
+
+object FlowRadius {
+    val card = 18.dp
+    val button = 14.dp
+    val input = 12.dp
+    val pill = 50.dp
+}
 
 private val FlowColorScheme = lightColorScheme(
     primary = FlowPrimary,

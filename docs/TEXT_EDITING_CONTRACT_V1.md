@@ -1,3 +1,5 @@
+> 0.1.0 说明：本契约定义编辑/解析层。当前运行执行不展开流程级/步骤级重复，运行语义见 [RUN_FEATURE.md](RUN_FEATURE.md) 和 [PRODUCT_RULES.md](PRODUCT_RULES.md)。文中 `repeatCount` 等字段属于旧文本兼容与编辑契约，不是当前 0.1.0 的执行扩展语义。
+
 # Flow 文本与卡片双向编辑契约 V1.1
 
 - 状态：Phase 1 契约 V1.1 修订；文中标注“待确认”的条目仍不属于已定需求。

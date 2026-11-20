@@ -14,3 +14,24 @@ ios/DerivedData/
 
 # Local debug signing artifacts
 **/debug.keystore
+
+# Release signing artifacts and local credentials
+*.jks
+*.keystore
+*.p12
+*.pem
+key.properties
+keystore.properties
+signing.properties
+flow-release.properties
+android/keystore/
+android/keystores/
+signing/
+
+# Local verification evidence; keep on disk but never stage as source
+artifacts/
+
+# Local credentials and transient output
+.env
+.env.*
+*.log

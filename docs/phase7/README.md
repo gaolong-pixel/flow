@@ -1,5 +1,7 @@
 # 阶段七执行引擎实施记录
 
+> 历史记录：阶段七执行引擎（ExecutionSession/Scheduler/Controller/TimerEngine）已在第二阶段被计划运行功能取代并删除。当前实现见 [RUN_FEATURE.md](../RUN_FEATURE.md)。本文仅保留历史实施记录。
+
 本目录记录阶段七执行引擎的最终实现状态。当前分支为 `2026111803_flow01`；阶段七生产代码与测试已提交为 `bcf48a6b577c119f2031aa3f86adaed5de45bdcf`，阶段七文档作为后续独立提交。
 
 ## 已完成的阶段

@@ -10,30 +10,42 @@ struct UiNotice: Equatable {
 final class FlowEditorModel: ObservableObject {
     @Published private(set) var state: EditorState?
     @Published private(set) var editorText: String = ""
+    @Published private(set) var planName: String = ""
+    @Published private(set) var nameError: String?
     @Published private(set) var startupError: String?
     @Published private(set) var modeMessage: String?
     @Published private(set) var notice: UiNotice?
 
     private var controller: EditorController?
 
-    init() {
+    private let persist: ((Routine) throws -> Void)?
+
+    init(draft: RoutineDraft? = nil, persist: ((Routine) throws -> Void)? = nil) {
+        self.persist = persist
         let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-        let draft = RoutineDraft(
+        let initialDraft = draft ?? RoutineDraft(
             id: UUID().uuidString,
-            name: "未命名流程",
+            name: "未命名计划",
             steps: [],
             createdAt: now,
             updatedAt: now
         )
+        planName = initialDraft.name
 
         do {
-            let controller = try EditorController(initialDraft: draft)
+            let controller = try EditorController(initialDraft: initialDraft, initialMode: .cards)
             self.controller = controller
             self.state = controller.state
             self.editorText = controller.state.textBuffer
         } catch {
             self.startupError = "编辑器初始化失败，请稍后再试。"
         }
+    }
+
+    func updateName(_ value: String) {
+        planName = value
+        nameError = nil
+        notice = nil
     }
 
     func updateText(_ text: String) {
@@ -44,18 +56,67 @@ final class FlowEditorModel: ObservableObject {
         modeMessage = nil
     }
 
-    func save() {
-        guard let controller else { return }
+    func applyText() {
+        guard let controller, state?.mode == .text else { return }
         let result = controller.commitText()
         state = result.state
-
         switch result {
         case .success(let resultState):
             editorText = resultState.textBuffer
-            notice = UiNotice(message: "已保存修改。", isError: false)
+            notice = UiNotice(message: "已应用文本修改。", isError: false)
             modeMessage = nil
         case .failure(let error, _):
             notice = UiNotice(message: commitErrorMessage(error), isError: true)
+        }
+    }
+
+    func savePlan() {
+        guard let controller else { return }
+
+        switch controller.rename(planName) {
+        case .failure(let error, let resultState):
+            state = resultState
+            nameError = nameErrorMessage(error)
+            notice = UiNotice(
+                message: nameError ?? "流程名称不合法。",
+                isError: true
+            )
+            modeMessage = nil
+
+        case .success(let renamedState):
+            state = renamedState
+            planName = renamedState.draft.name
+            nameError = nil
+
+            if renamedState.mode == .cards {
+                // Card edits live in the draft directly; persist the draft and
+                // the name together. The name is not part of the step text.
+                do {
+                    try persist?(renamedState.draft.toRoutine())
+                    notice = UiNotice(message: "已保存修改。", isError: false)
+                } catch {
+                    notice = UiNotice(message: "保存到计划存储失败。", isError: true)
+                }
+                modeMessage = nil
+                return
+            }
+
+            let result = controller.commitText()
+            state = result.state
+
+            switch result {
+            case .success(let resultState):
+                editorText = resultState.textBuffer
+                do {
+                    try persist?(resultState.draft.toRoutine())
+                    notice = UiNotice(message: "已保存修改。", isError: false)
+                } catch {
+                    notice = UiNotice(message: "保存到计划存储失败。", isError: true)
+                }
+                modeMessage = nil
+            case .failure(let error, _):
+                notice = UiNotice(message: commitErrorMessage(error), isError: true)
+            }
         }
     }
 
@@ -147,6 +208,17 @@ final class FlowEditorModel: ObservableObject {
         }
     }
 
+    private func nameErrorMessage(_ error: EditorError) -> String? {
+        switch error {
+        case .invalidName:
+            return "流程名称不能为空。"
+        case .nameTooLong:
+            return "流程名称最多 \(EditorController.maxNameLength) 个字符。"
+        default:
+            return nil
+        }
+    }
+
     private func commitErrorMessage(_ error: EditorError) -> String {
         switch error {
         case .textBlocked:
@@ -163,6 +235,10 @@ final class FlowEditorModel: ObservableObject {
             return "步骤顺序调整失败。"
         case .invalidRepeatCount:
             return "重复次数必须大于零。"
+        case .invalidName:
+            return "流程名称不能为空。"
+        case .nameTooLong:
+            return "流程名称最多 \(EditorController.maxNameLength) 个字符。"
         case .serializationFailed:
             return "当前内容暂时无法转换为规范文本，请检查输入。"
         case .wrongMode:

@@ -7,38 +7,43 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		01A5F6163574ACAD738D4BF4 /* ExecutionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08AEE78D1AD9CD68FF37BEA2 /* ExecutionTypes.swift */; };
-		1B74107EFE798032A8592E43 /* ExecutionTimerEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4730F049F67769F414514F7A /* ExecutionTimerEngineTests.swift */; };
+		A92000000000000000000001 /* PlanStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92000000000000000000002 /* PlanStoreTests.swift */; };
+		A91000000000000000000001 /* PlanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91000000000000000000002 /* PlanStore.swift */; };
 		1D8D63BA11BC3ED7AF56A2B5 /* FlowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA01D5BB9913A7EDB79665 /* FlowApp.swift */; };
-		46C02255071A0029715AC2D6 /* ExecutionSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D2D4DA7BB72FD9C565D14C5 /* ExecutionSessionTests.swift */; };
-		561E10F348E7E8811A2F1546 /* ExecutionCompleteSkipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7AFDB85EEF36051652321F /* ExecutionCompleteSkipTests.swift */; };
 		625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */; };
 		6F0EB98F6936F96A7EEE0691 /* RoutineTextParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */; };
 		780A29047809E4BAAD9C0E22 /* RoutineDomainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */; };
-		7A314C9CFD4DE59A85527CEE /* ExecutionScheduling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */; };
-		808616FCC49FCE12C111992A /* ExecutionCountingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602DF1E437AC678BDC092090 /* ExecutionCountingTests.swift */; };
 		84D0AAE24220F61A5F059A65 /* RoutineTextSerializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21088242D0EB8C895955431F /* RoutineTextSerializer.swift */; };
-		8C072BB5BF69BC90A6B1A127 /* ExecutionControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */; };
-		8DF22295B6DA50FA04BA3B2A /* ExecutionSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B70BDBF24A942F7CC01D038 /* ExecutionSession.swift */; };
 		9008BCC2E7AEE949C5AB2768 /* FlowEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */; };
 		902C341CD21122EA332D08A8 /* ParseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9478F4BE53A3F55848DA254 /* ParseModels.swift */; };
-		9F0D00D3EE2A7F79078B5C83 /* ExecutionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */; };
 		B8835920792E779AC3E0FA1B /* RoutineStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 762167171614C6A30DDABEE1 /* RoutineStep.swift */; };
 		BD2AFF41382ECADEE8D76B95 /* FlowRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */; };
 		C51E080F211AA0E3B59FA43E /* TextWhitespace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B74E97910E645A768901C8 /* TextWhitespace.swift */; };
-		C77242796D95B76301842B30 /* ExecutionSchedulingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 722CA512C2F1BDC9CEC7CD54 /* ExecutionSchedulingTests.swift */; };
 		CCC9E9F58435FBD81410C136 /* CardStepEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECD85403D9C5E983C443406 /* CardStepEditorView.swift */; };
 		CD7036DC3FCEB68EF8BED08C /* RoutineDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94DFE7EC867DB498F4B24A85 /* RoutineDraft.swift */; };
 		CDB67A730B9857826BB3E946 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E8DFD802D29577291A5605C /* Routine.swift */; };
-		D18E11294A36281A71B0B9CB /* ExecutionTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA959AF3FAA2B2AB62878A2 /* ExecutionTimerEngine.swift */; };
 		D5A03B4A7ACF441ADE0EE8D2 /* StepIDMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3451BEF383FDCFC02341C20B /* StepIDMatcher.swift */; };
 		D90E940DBAC88ABE8E1C1844 /* DomainTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37EB38B7ECF895B6A2EC9069 /* DomainTypes.swift */; };
 		E44F88F79FFF20D5FF179064 /* EditorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39088489F0DF1432B992B82D /* EditorController.swift */; };
 		E725B64EC8318DA24DFB7D3A /* EditorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60077F034A345D5A6D7109F3 /* EditorState.swift */; };
-		E9F6CB649A6D518221908133 /* ExecutionControllerTimerStartTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D80AEB8A3DCADC372B02E9C /* ExecutionControllerTimerStartTests.swift */; };
-		F5B315139E7BE0541320B2E8 /* ExecutionTimerStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0259219085521271D3743EB5 /* ExecutionTimerStateTests.swift */; };
 		F69D315B54FA8DCD0C50CA41 /* ParserSerializerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */; };
-		FA7C945D2FD9C7ACEE40675E /* ExecutionControllerTimerBindingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1316BD33DEDD0A63EA95BEE /* ExecutionControllerTimerBindingTests.swift */; };
+		F1B000000000000000000002 /* RunClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000001 /* RunClock.swift */; };
+		F1B000000000000000000004 /* PlanRunController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000003 /* PlanRunController.swift */; };
+		F1B000000000000000000006 /* RunCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000005 /* RunCoordinator.swift */; };
+		F1B000000000000000000008 /* RunFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000007 /* RunFormatting.swift */; };
+		F1B00000000000000000000A /* RunNotificationSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000009 /* RunNotificationSink.swift */; };
+		F1B00000000000000000000C /* RunSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A00000000000000000000B /* RunSetupView.swift */; };
+		F1B00000000000000000000E /* RunView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A00000000000000000000D /* RunView.swift */; };
+		F1B000000000000000000010 /* RunResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A00000000000000000000F /* RunResultView.swift */; };
+		F1B000000000000000000012 /* FakeRunClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000011 /* FakeRunClock.swift */; };
+		F1B000000000000000000014 /* PlanRunControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000013 /* PlanRunControllerTests.swift */; };
+		F1B000000000000000000016 /* RunCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000015 /* RunCoordinatorTests.swift */; };
+		F1B000000000000000000018 /* RunNotificationSinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000017 /* RunNotificationSinkTests.swift */; };
+		F1B00000000000000000001A /* RunFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000000000000000000019 /* RunFormattingTests.swift */; };
+		F20000000000000000000004 /* FlowRunFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* FlowRunFlowUITests.swift */; };
+		F30000000000000000000002 /* FlowTimerNotificationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000001 /* FlowTimerNotificationUITests.swift */; };
+		F40000000000000000000002 /* FlowPlanNamingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000001 /* FlowPlanNamingUITests.swift */; };
+		F50000000000000000000002 /* FlowDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000000000000000000001 /* FlowDesignSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,43 +54,56 @@
 			remoteGlobalIDString = 582133B0091E7B797566D191;
 			remoteInfo = Flow;
 		};
+		F20000000000000000000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2AA6D7BA5D8BD56A395381D5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 582133B0091E7B797566D191;
+			remoteInfo = Flow;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A92000000000000000000002 /* PlanStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAppTests/Data/PlanStoreTests.swift; sourceTree = SOURCE_ROOT; };
+		A91000000000000000000002 /* PlanStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Data/PlanStore.swift; sourceTree = SOURCE_ROOT; };
 		0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDomainTests.swift; sourceTree = "<group>"; };
-		0259219085521271D3743EB5 /* ExecutionTimerStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionTimerStateTests.swift; sourceTree = "<group>"; };
-		08AEE78D1AD9CD68FF37BEA2 /* ExecutionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionTypes.swift; sourceTree = "<group>"; };
 		1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowRootView.swift; sourceTree = "<group>"; };
 		21088242D0EB8C895955431F /* RoutineTextSerializer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineTextSerializer.swift; sourceTree = "<group>"; };
-		2D80AEB8A3DCADC372B02E9C /* ExecutionControllerTimerStartTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionControllerTimerStartTests.swift; sourceTree = "<group>"; };
 		3451BEF383FDCFC02341C20B /* StepIDMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepIDMatcher.swift; sourceTree = "<group>"; };
 		37EB38B7ECF895B6A2EC9069 /* DomainTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainTypes.swift; sourceTree = "<group>"; };
 		39088489F0DF1432B992B82D /* EditorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorController.swift; sourceTree = "<group>"; };
-		4730F049F67769F414514F7A /* ExecutionTimerEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionTimerEngineTests.swift; sourceTree = "<group>"; };
 		60077F034A345D5A6D7109F3 /* EditorState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorState.swift; sourceTree = "<group>"; };
-		602DF1E437AC678BDC092090 /* ExecutionCountingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionCountingTests.swift; sourceTree = "<group>"; };
 		65B74E97910E645A768901C8 /* TextWhitespace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextWhitespace.swift; sourceTree = "<group>"; };
-		722CA512C2F1BDC9CEC7CD54 /* ExecutionSchedulingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionSchedulingTests.swift; sourceTree = "<group>"; };
 		762167171614C6A30DDABEE1 /* RoutineStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineStep.swift; sourceTree = "<group>"; };
 		7C05D1C3683EFAEC836826DC /* Flow.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Flow.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7D2D4DA7BB72FD9C565D14C5 /* ExecutionSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionSessionTests.swift; sourceTree = "<group>"; };
 		8E8DFD802D29577291A5605C /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
 		8ECD85403D9C5E983C443406 /* CardStepEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStepEditorView.swift; sourceTree = "<group>"; };
 		94DFE7EC867DB498F4B24A85 /* RoutineDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineDraft.swift; sourceTree = "<group>"; };
 		95FA01D5BB9913A7EDB79665 /* FlowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp.swift; sourceTree = "<group>"; };
-		9B70BDBF24A942F7CC01D038 /* ExecutionSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionSession.swift; sourceTree = "<group>"; };
 		A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSerializerTests.swift; sourceTree = "<group>"; };
-		A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionControllerTests.swift; sourceTree = "<group>"; };
-		A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionScheduling.swift; sourceTree = "<group>"; };
 		B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowEditorModel.swift; sourceTree = "<group>"; };
 		C0A49B896CDD6090294556C5 /* RoutineTextParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineTextParser.swift; sourceTree = "<group>"; };
-		CC7AFDB85EEF36051652321F /* ExecutionCompleteSkipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionCompleteSkipTests.swift; sourceTree = "<group>"; };
-		DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionController.swift; sourceTree = "<group>"; };
-		DFA959AF3FAA2B2AB62878A2 /* ExecutionTimerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionTimerEngine.swift; sourceTree = "<group>"; };
 		E8D296822B861C00CC436CE9 /* FlowTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FlowTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		F1316BD33DEDD0A63EA95BEE /* ExecutionControllerTimerBindingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutionControllerTimerBindingTests.swift; sourceTree = "<group>"; };
 		F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorControllerTests.swift; sourceTree = "<group>"; };
 		F9478F4BE53A3F55848DA254 /* ParseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParseModels.swift; sourceTree = "<group>"; };
+		F1A000000000000000000001 /* RunClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Domain/Run/RunClock.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000003 /* PlanRunController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Domain/Run/PlanRunController.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000005 /* RunCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Domain/Run/RunCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000007 /* RunFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Domain/Run/RunFormatting.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000009 /* RunNotificationSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Platform/RunNotificationSink.swift; sourceTree = SOURCE_ROOT; };
+		F1A00000000000000000000B /* RunSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Presentation/RunSetupView.swift; sourceTree = SOURCE_ROOT; };
+		F1A00000000000000000000D /* RunView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Presentation/RunView.swift; sourceTree = SOURCE_ROOT; };
+		F1A00000000000000000000F /* RunResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Presentation/RunResultView.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000011 /* FakeRunClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAppTests/Run/FakeRunClock.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000013 /* PlanRunControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAppTests/Run/PlanRunControllerTests.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000015 /* RunCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAppTests/Run/RunCoordinatorTests.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000017 /* RunNotificationSinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAppTests/Run/RunNotificationSinkTests.swift; sourceTree = SOURCE_ROOT; };
+		F1A000000000000000000019 /* RunFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowAppTests/Run/RunFormattingTests.swift; sourceTree = SOURCE_ROOT; };
+		F20000000000000000000002 /* FlowUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F20000000000000000000003 /* FlowRunFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowUITests/FlowRunFlowUITests.swift; sourceTree = SOURCE_ROOT; };
+		F30000000000000000000001 /* FlowTimerNotificationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowUITests/FlowTimerNotificationUITests.swift; sourceTree = SOURCE_ROOT; };
+		F40000000000000000000001 /* FlowPlanNamingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowUITests/FlowPlanNamingUITests.swift; sourceTree = SOURCE_ROOT; };
+		F50000000000000000000001 /* FlowDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowApp/Presentation/FlowDesignSystem.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -93,17 +111,9 @@
 			isa = PBXGroup;
 			children = (
 				F5043F4BB508453372FDAEEB /* EditorControllerTests.swift */,
-				CC7AFDB85EEF36051652321F /* ExecutionCompleteSkipTests.swift */,
-				A76F2057C498D87D3FDE342B /* ExecutionControllerTests.swift */,
-				F1316BD33DEDD0A63EA95BEE /* ExecutionControllerTimerBindingTests.swift */,
-				2D80AEB8A3DCADC372B02E9C /* ExecutionControllerTimerStartTests.swift */,
-				602DF1E437AC678BDC092090 /* ExecutionCountingTests.swift */,
-				722CA512C2F1BDC9CEC7CD54 /* ExecutionSchedulingTests.swift */,
-				7D2D4DA7BB72FD9C565D14C5 /* ExecutionSessionTests.swift */,
-				0259219085521271D3743EB5 /* ExecutionTimerStateTests.swift */,
 				A50F87B0EBB23ABB0CEEF2F3 /* ParserSerializerTests.swift */,
 				0026774DD65DC6988325CFCF /* RoutineDomainTests.swift */,
-				EAD576C591D57FCD60058A40 /* Timer */,
+				F1E00000000000000000001D /* Run */,
 			);
 			path = FlowAppTests;
 			sourceTree = "<group>";
@@ -123,6 +133,7 @@
 			children = (
 				7C05D1C3683EFAEC836826DC /* Flow.app */,
 				E8D296822B861C00CC436CE9 /* FlowTests.xctest */,
+				F20000000000000000000002 /* FlowUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -133,6 +144,10 @@
 				8ECD85403D9C5E983C443406 /* CardStepEditorView.swift */,
 				B5E846F7FAC79E9C812FC80F /* FlowEditorModel.swift */,
 				1737B3A8A7CAC003D561CCE4 /* FlowRootView.swift */,
+				F1A00000000000000000000B /* RunSetupView.swift */,
+				F50000000000000000000001 /* FlowDesignSystem.swift */,
+				F1A00000000000000000000D /* RunView.swift */,
+				F1A00000000000000000000F /* RunResultView.swift */,
 			);
 			path = Presentation;
 			sourceTree = "<group>";
@@ -147,31 +162,12 @@
 			path = Editor;
 			sourceTree = "<group>";
 		};
-		B484A94D0607954059C59785 /* Timer */ = {
-			isa = PBXGroup;
-			children = (
-				DFA959AF3FAA2B2AB62878A2 /* ExecutionTimerEngine.swift */,
-			);
-			path = Timer;
-			sourceTree = "<group>";
-		};
-		BCA705AE1F9C1EA59A4D93E3 /* Execution */ = {
-			isa = PBXGroup;
-			children = (
-				DCD88CCFAC1DC1021294ED90 /* ExecutionController.swift */,
-				A9359C8E7326C650A89DB75D /* ExecutionScheduling.swift */,
-				9B70BDBF24A942F7CC01D038 /* ExecutionSession.swift */,
-				08AEE78D1AD9CD68FF37BEA2 /* ExecutionTypes.swift */,
-				B484A94D0607954059C59785 /* Timer */,
-			);
-			path = Execution;
-			sourceTree = "<group>";
-		};
 		C3DBD8A85E3100385348A5C6 = {
 			isa = PBXGroup;
 			children = (
 				E263EE4334EA695C769C7F18 /* FlowApp */,
 				026A50B0F5DC40D43680538E /* FlowAppTests */,
+				F20000000000000000000005 /* FlowUITests */,
 				12E09804F282BABC47EBF4CF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -185,7 +181,7 @@
 				762167171614C6A30DDABEE1 /* RoutineStep.swift */,
 				65B74E97910E645A768901C8 /* TextWhitespace.swift */,
 				3CFA3003861AD042EF8AFAAB /* Editor */,
-				BCA705AE1F9C1EA59A4D93E3 /* Execution */,
+				F1C00000000000000000001B /* Run */,
 				0A1A03E0A19A842ECFECEFDB /* Parser */,
 			);
 			path = Domain;
@@ -196,17 +192,51 @@
 			children = (
 				95FA01D5BB9913A7EDB79665 /* FlowApp.swift */,
 				E11DD6E74053CECCE99DFCD1 /* Domain */,
+				F1D00000000000000000001C /* Platform */,
 				3C035241883BCB537D0F71FE /* Presentation */,
 			);
 			path = FlowApp;
 			sourceTree = "<group>";
 		};
-		EAD576C591D57FCD60058A40 /* Timer */ = {
+		F1C00000000000000000001B /* Run */ = {
 			isa = PBXGroup;
 			children = (
-				4730F049F67769F414514F7A /* ExecutionTimerEngineTests.swift */,
+				F1A000000000000000000001 /* RunClock.swift */,
+				F1A000000000000000000003 /* PlanRunController.swift */,
+				F1A000000000000000000005 /* RunCoordinator.swift */,
+				F1A000000000000000000007 /* RunFormatting.swift */,
 			);
-			path = Timer;
+			path = Run;
+			sourceTree = "<group>";
+		};
+		F1D00000000000000000001C /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				F1A000000000000000000009 /* RunNotificationSink.swift */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
+		F1E00000000000000000001D /* Run */ = {
+			isa = PBXGroup;
+			children = (
+				F1A000000000000000000011 /* FakeRunClock.swift */,
+				F1A000000000000000000013 /* PlanRunControllerTests.swift */,
+				F1A000000000000000000015 /* RunCoordinatorTests.swift */,
+				F1A000000000000000000017 /* RunNotificationSinkTests.swift */,
+				F1A000000000000000000019 /* RunFormattingTests.swift */,
+			);
+			path = Run;
+			sourceTree = "<group>";
+		};
+		F20000000000000000000005 /* FlowUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000003 /* FlowRunFlowUITests.swift */,
+				F30000000000000000000001 /* FlowTimerNotificationUITests.swift */,
+				F40000000000000000000001 /* FlowPlanNamingUITests.swift */,
+			);
+			path = FlowUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -247,6 +277,24 @@
 			productReference = E8D296822B861C00CC436CE9 /* FlowTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F20000000000000000000001 /* FlowUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F2000000000000000000000B /* Build configuration list for PBXNativeTarget "FlowUITests" */;
+			buildPhases = (
+				F20000000000000000000006 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F20000000000000000000007 /* PBXTargetDependency */,
+			);
+			name = FlowUITests;
+			packageProductDependencies = (
+			);
+			productName = FlowUITests;
+			productReference = F20000000000000000000002 /* FlowUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -278,6 +326,7 @@
 			targets = (
 				582133B0091E7B797566D191 /* Flow */,
 				60E39D864D8F99277AEBCA03 /* FlowTests */,
+				F20000000000000000000001 /* FlowUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -291,14 +340,10 @@
 				D90E940DBAC88ABE8E1C1844 /* DomainTypes.swift in Sources */,
 				E44F88F79FFF20D5FF179064 /* EditorController.swift in Sources */,
 				E725B64EC8318DA24DFB7D3A /* EditorState.swift in Sources */,
-				9F0D00D3EE2A7F79078B5C83 /* ExecutionController.swift in Sources */,
-				7A314C9CFD4DE59A85527CEE /* ExecutionScheduling.swift in Sources */,
-				8DF22295B6DA50FA04BA3B2A /* ExecutionSession.swift in Sources */,
-				D18E11294A36281A71B0B9CB /* ExecutionTimerEngine.swift in Sources */,
-				01A5F6163574ACAD738D4BF4 /* ExecutionTypes.swift in Sources */,
 				1D8D63BA11BC3ED7AF56A2B5 /* FlowApp.swift in Sources */,
 				9008BCC2E7AEE949C5AB2768 /* FlowEditorModel.swift in Sources */,
 				BD2AFF41382ECADEE8D76B95 /* FlowRootView.swift in Sources */,
+				A91000000000000000000001 /* PlanStore.swift in Sources */,
 				902C341CD21122EA332D08A8 /* ParseModels.swift in Sources */,
 				CDB67A730B9857826BB3E946 /* Routine.swift in Sources */,
 				CD7036DC3FCEB68EF8BED08C /* RoutineDraft.swift in Sources */,
@@ -307,6 +352,15 @@
 				84D0AAE24220F61A5F059A65 /* RoutineTextSerializer.swift in Sources */,
 				D5A03B4A7ACF441ADE0EE8D2 /* StepIDMatcher.swift in Sources */,
 				C51E080F211AA0E3B59FA43E /* TextWhitespace.swift in Sources */,
+				F1B000000000000000000002 /* RunClock.swift in Sources */,
+				F1B000000000000000000004 /* PlanRunController.swift in Sources */,
+				F1B000000000000000000006 /* RunCoordinator.swift in Sources */,
+				F1B000000000000000000008 /* RunFormatting.swift in Sources */,
+				F1B00000000000000000000A /* RunNotificationSink.swift in Sources */,
+				F1B00000000000000000000C /* RunSetupView.swift in Sources */,
+				F50000000000000000000002 /* FlowDesignSystem.swift in Sources */,
+				F1B00000000000000000000E /* RunView.swift in Sources */,
+				F1B000000000000000000010 /* RunResultView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,17 +369,24 @@
 			buildActionMask = 2147483647;
 			files = (
 				625919B52516107E3DF58FF6 /* EditorControllerTests.swift in Sources */,
-				561E10F348E7E8811A2F1546 /* ExecutionCompleteSkipTests.swift in Sources */,
-				8C072BB5BF69BC90A6B1A127 /* ExecutionControllerTests.swift in Sources */,
-				FA7C945D2FD9C7ACEE40675E /* ExecutionControllerTimerBindingTests.swift in Sources */,
-				E9F6CB649A6D518221908133 /* ExecutionControllerTimerStartTests.swift in Sources */,
-				808616FCC49FCE12C111992A /* ExecutionCountingTests.swift in Sources */,
-				C77242796D95B76301842B30 /* ExecutionSchedulingTests.swift in Sources */,
-				46C02255071A0029715AC2D6 /* ExecutionSessionTests.swift in Sources */,
-				1B74107EFE798032A8592E43 /* ExecutionTimerEngineTests.swift in Sources */,
-				F5B315139E7BE0541320B2E8 /* ExecutionTimerStateTests.swift in Sources */,
+				A92000000000000000000001 /* PlanStoreTests.swift in Sources */,
 				F69D315B54FA8DCD0C50CA41 /* ParserSerializerTests.swift in Sources */,
 				780A29047809E4BAAD9C0E22 /* RoutineDomainTests.swift in Sources */,
+				F1B000000000000000000012 /* FakeRunClock.swift in Sources */,
+				F1B000000000000000000014 /* PlanRunControllerTests.swift in Sources */,
+				F1B000000000000000000016 /* RunCoordinatorTests.swift in Sources */,
+				F1B000000000000000000018 /* RunNotificationSinkTests.swift in Sources */,
+				F1B00000000000000000001A /* RunFormattingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F20000000000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F20000000000000000000004 /* FlowRunFlowUITests.swift in Sources */,
+				F30000000000000000000002 /* FlowTimerNotificationUITests.swift in Sources */,
+				F40000000000000000000002 /* FlowPlanNamingUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -336,6 +397,11 @@
 			isa = PBXTargetDependency;
 			target = 582133B0091E7B797566D191 /* Flow */;
 			targetProxy = CBA7E02CF45F693DEEEC89A0 /* PBXContainerItemProxy */;
+		};
+		F20000000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 582133B0091E7B797566D191 /* Flow */;
+			targetProxy = F20000000000000000000008 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -549,6 +615,36 @@
 			};
 			name = Release;
 		};
+		F20000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flow.app.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Flow;
+			};
+			name = Debug;
+		};
+		F2000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.flow.app.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Flow;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -575,6 +671,15 @@
 			buildConfigurations = (
 				3891A116B2A789B1EF826D8B /* Debug */,
 				CBFA6DECCA0D9979D5698794 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F2000000000000000000000B /* Build configuration list for PBXNativeTarget "FlowUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000009 /* Debug */,
+				F2000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

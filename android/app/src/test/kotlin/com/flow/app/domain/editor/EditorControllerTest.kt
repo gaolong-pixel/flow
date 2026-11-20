@@ -511,6 +511,76 @@ class EditorControllerTest {
         assertEquals(EditorMode.TEXT, controller.state.mode)
     }
 
+    @Test
+    fun renameTrimsNameAndKeepsPlanAndStepIdentity() {
+        val controller = EditorController(
+            draft(count("a", "Push-ups", 15), timer("b", "Read", 60_000))
+        )
+        val before = controller.state.draft
+
+        val renamed = success(controller.rename("  Morning Flow  "))
+
+        assertEquals("Morning Flow", renamed.draft.name)
+        assertEquals("draft", renamed.draft.id)
+        assertEquals(before.steps, renamed.draft.steps)
+        assertEquals(listOf("a", "b"), renamed.draft.steps.map { it.id })
+        assertEquals("Morning Flow", renamed.draft.toRoutine().name)
+    }
+
+    @Test
+    fun renameRejectsBlankNameWithoutChangingDraft() {
+        val controller = EditorController(draft(count("a", "Push-ups", 15)))
+        val before = controller.state.draft
+
+        val result = controller.rename(" \u00A0 ")
+
+        assertEquals(EditorError.INVALID_NAME, failure(result))
+        assertEquals(before, controller.state.draft)
+    }
+
+    @Test
+    fun renameRejectsOverlongName() {
+        val controller = EditorController(draft(count("a", "Push-ups", 15)))
+        val before = controller.state.draft
+
+        val result = controller.rename("a".repeat(EditorController.MAX_NAME_LENGTH + 1))
+
+        assertEquals(EditorError.NAME_TOO_LONG, failure(result))
+        assertEquals(before, controller.state.draft)
+    }
+
+    @Test
+    fun renameThenCommitTextPersistsNameWithNewSteps() {
+        val controller = EditorController(
+            draft(count("a", "Push-ups", 15), timer("b", "Read", 60_000))
+        )
+
+        success(controller.rename("  Renamed  "))
+        controller.onTextChanged("Push-ups 20次\nRead 1分钟")
+        val committed = success(controller.commitText())
+
+        assertEquals("Renamed", committed.draft.name)
+        assertEquals(20, committed.draft.steps[0].target)
+        assertEquals("a", committed.draft.steps[0].id)
+        assertEquals("b", committed.draft.steps[1].id)
+        assertEquals("Renamed", committed.draft.toRoutine().name)
+    }
+
+    @Test
+    fun renameInCardsModePreservesStepIDsAndOrder() {
+        val controller = EditorController(
+            draft(count("a", "Push-ups", 15), timer("b", "Read", 60_000))
+        )
+        success(controller.switchMode(EditorMode.CARDS))
+
+        val renamed = success(controller.rename("Evening Flow"))
+
+        assertEquals("Evening Flow", renamed.draft.name)
+        assertEquals(listOf("a", "b"), renamed.draft.steps.map { it.id })
+        assertEquals(listOf("Push-ups", "Read"), renamed.draft.steps.map { it.name })
+        assertEquals(EditorMode.CARDS, renamed.mode)
+    }
+
     private fun success(result: EditorResult): EditorState {
         assertTrue("Expected success, got $result", result is EditorResult.Success)
         return (result as EditorResult.Success).state

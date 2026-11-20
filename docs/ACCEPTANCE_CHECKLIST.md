@@ -1,3 +1,5 @@
+> 历史验收文档：本清单记录第一阶段和阶段七执行引擎的历史验收项。阶段七 ExecutionSession/Scheduler/TimerEngine、SKIP、records 已在第二阶段移除；当前产品与运行规则以 [PRODUCT_RULES.md](PRODUCT_RULES.md) 和 [RUN_FEATURE.md](RUN_FEATURE.md) 为准。下面涉及旧执行引擎的条目仅保留历史记录。
+
 # 第一阶段验收
 
 对应契约：[文本与卡片双向编辑契约 V1.1](TEXT_EDITING_CONTRACT_V1.md)。

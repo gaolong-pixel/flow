@@ -8,6 +8,7 @@ import com.flow.app.domain.parser.RoutineTextParser
 import com.flow.app.domain.parser.RoutineTextSerializer
 import com.flow.app.domain.parser.SerializationException
 import com.flow.app.domain.parser.StepCandidate
+import com.flow.app.domain.model.trimFlowWhitespace
 import java.util.UUID
 
 /**
@@ -95,6 +96,28 @@ class EditorController(
         } catch (error: SerializationException) {
             EditorResult.Failure(EditorError.SERIALIZATION_FAILED, state)
         }
+    }
+
+    /**
+     * Renames the routine without touching step IDs, order or step fields.
+     * The text buffer is intentionally left untouched: the routine name is not
+     * part of the step text syntax. The updated name is carried into the next
+     * commit()/toRoutine() persistence.
+     */
+    fun rename(newName: String): EditorResult {
+        val trimmed = newName.trimFlowWhitespace()
+        if (trimmed.isEmpty()) {
+            return EditorResult.Failure(EditorError.INVALID_NAME, state)
+        }
+        if (trimmed.length > MAX_NAME_LENGTH) {
+            return EditorResult.Failure(EditorError.NAME_TOO_LONG, state)
+        }
+        if (trimmed == state.draft.name) {
+            return EditorResult.Success(state)
+        }
+
+        state = state.copy(draft = state.draft.rename(trimmed))
+        return EditorResult.Success(state)
     }
 
     fun addStep(candidate: StepCandidate): EditorResult = cardOperation {
@@ -248,6 +271,10 @@ class EditorController(
 
     private fun canonicalText(steps: List<RoutineStep>): String =
         serializer.serialize(steps.map(::candidateOf))
+
+    companion object {
+        const val MAX_NAME_LENGTH: Int = 60
+    }
 
     private fun candidateOf(step: RoutineStep): StepCandidate = StepCandidate(
         name = step.name,
