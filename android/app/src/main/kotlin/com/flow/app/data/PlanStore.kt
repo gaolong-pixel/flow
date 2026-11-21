@@ -28,7 +28,8 @@ class PlanStore(private val file: File) {
     }
 
     fun save(plan: Routine): Boolean = synchronized(lock) {
-        if (!plan.isValid) return false
+        // A plan with no steps is an unsaved draft, never a valid record.
+        if (plan.steps.isEmpty() || !plan.isValid) return false
         try {
             val plans = if (file.exists()) loadAll().toMutableList() else mutableListOf()
             val index = plans.indexOfFirst { it.id == plan.id }

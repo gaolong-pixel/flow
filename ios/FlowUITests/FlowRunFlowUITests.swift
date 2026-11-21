@@ -141,7 +141,7 @@ final class FlowRunFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["2 个节点"].exists)
     }
 
-    func testLaunchCountdownCanBeSkippedWithoutDoubleStart() {
+    func testLaunchCountdownCanBeCancelledAndStartsOnce() {
         createPlan(expectedTotalPlans: 1, steps: [
             CardStep(type: .count, name: "Launch", value: 5)
         ])
@@ -154,14 +154,21 @@ final class FlowRunFlowUITests: XCTestCase {
         XCTAssertTrue(setupStart.waitForExistence(timeout: 8))
         setupStart.tap()
 
-        let skip = app.buttons["launch-skip"]
-        XCTAssertTrue(skip.waitForExistence(timeout: 3))
-        // The session must not exist while the countdown is running.
+        let cancel = app.buttons["launch-cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3))
+        // The formal session must not exist while the countdown is running.
         XCTAssertFalse(app.buttons["run-primary"].exists)
-        attachScreenshot("launch-countdown")
+        attachScreenshot("launch-ready")
 
-        skip.tap()
-        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 6))
+        cancel.tap()
+        XCTAssertTrue(setupStart.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["run-primary"].exists)
+
+        setupStart.tap()
+        let started = Date()
+        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 8))
+        let elapsed = Date().timeIntervalSince(started)
+        XCTAssertGreaterThanOrEqual(elapsed, 4.0)
         XCTAssertTrue(app.staticTexts["1 / 1"].exists)
         XCTAssertEqual(app.buttons.matching(identifier: "run-primary").count, 1)
 
@@ -262,106 +269,7 @@ final class FlowRunFlowUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.4)
     }
 
-    func testSkippedNodeCanBeReselectedAndCompleted() {
-        createPlan(expectedTotalPlans: 1, steps: [
-            CardStep(type: .count, name: "SkipA", value: 5),
-            CardStep(type: .count, name: "SkipB", value: 3),
-            CardStep(type: .count, name: "SkipC", value: 4)
-        ])
-        startPlan(at: 0)
-        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 8))
 
-        // Skip a READY node. It stays in the roller as a selectable card.
-        app.buttons["run-skip"].tap()
-        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["已完成 0"].exists)
-        let skippedA = app.buttons["run-node-0"]
-        XCTAssertTrue(skippedA.waitForExistence(timeout: 5))
-        XCTAssertTrue(skippedA.label.contains("已跳过"))
-        attachScreenshot("roller-skipped-visible")
-
-        // Reselect it: a never-started node returns to READY.
-        skippedA.tap()
-        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["run-primary"].label, "开始")
-
-        // Start it, skip it while RUNNING, then reselect: the RUNNING state is
-        // retained, so the primary action is still "完成当前节点".
-        app.buttons["run-primary"].tap()
-        XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
-        app.buttons["run-skip"].tap()
-        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5))
-        let skippedRunningA = app.buttons["run-node-0"]
-        XCTAssertTrue(skippedRunningA.waitForExistence(timeout: 5))
-        skippedRunningA.tap()
-        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
-        attachScreenshot("roller-skipped-reselected")
-
-        // Only an explicit completion moves it to the archive.
-        app.buttons["run-primary"].tap()
-        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["已完成 1"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["SkipA"].exists)
-
-        // Skip B while C is still active. B remains visible in the roller.
-        app.buttons["run-skip"].tap()
-        XCTAssertTrue(app.staticTexts["3 / 3"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["run-node-1"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["SkipB"].exists)
-
-        // C is the last active node: skipping it is disabled so the flow can
-        // always return to a skipped node.
-        XCTAssertFalse(app.buttons["run-skip"].isEnabled)
-
-        // Complete C; because B is still skipped, the run does not finalize
-        // immediately. It asks whether to go back or end.
-        XCTAssertEqual(app.buttons["run-primary"].label, "开始")
-        app.buttons["run-primary"].tap()
-        app.buttons["run-primary"].tap()
-        XCTAssertTrue(app.staticTexts["已经到最后一步啦"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["之前还有 1 个节点被跳过，是否回去完成？"].exists)
-        XCTAssertTrue(app.buttons["去完成跳过节点"].exists)
-        attachScreenshot("skipped-review-finish")
-        app.buttons["直接结束并查看结果"].tap()
-        XCTAssertTrue(app.staticTexts["本次流程结束"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["已完成 2 个节点，跳过 1 个"].exists)
-        XCTAssertTrue(app.staticTexts["跳过 1"].exists)
-        attachScreenshot("result-skipped")
-        app.buttons["result-back"].tap()
-        XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
-    }
-
-    func testSkippedReviewCanGoBackAndComplete() {
-        createPlan(expectedTotalPlans: 1, steps: [
-            CardStep(type: .count, name: "GoBackA", value: 3),
-            CardStep(type: .count, name: "GoBackB", value: 4)
-        ])
-        startPlan(at: 0)
-        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 8))
-
-        app.buttons["run-skip"].tap() // A skipped, B current
-        XCTAssertTrue(app.staticTexts["2 / 2"].waitForExistence(timeout: 5))
-        app.buttons["run-primary"].tap() // start B
-        app.buttons["run-primary"].tap() // complete B
-
-        XCTAssertTrue(app.staticTexts["已经到最后一步啦"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["之前还有 1 个节点被跳过，是否回去完成？"].exists)
-        attachScreenshot("skipped-review-resume")
-        app.buttons["去完成跳过节点"].tap()
-
-        XCTAssertTrue(app.staticTexts["1 / 2"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["run-primary"].label, "开始")
-        app.buttons["run-primary"].tap()
-        XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
-        attachScreenshot("skipped-review-resumed")
-        app.buttons["run-primary"].tap()
-
-        XCTAssertTrue(app.staticTexts["执行完成！"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["2 / 2 个节点"].exists)
-        app.buttons["result-back"].tap()
-        XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
-    }
 
     // MARK: - Helpers
 
@@ -429,7 +337,7 @@ final class FlowRunFlowUITests: XCTestCase {
         let save = app.buttons["editor-save-top"]
         XCTAssertTrue(save.waitForExistence(timeout: 8))
         save.tap()
-        app.buttons["editor-back"].tap()
+        // New-plan save returns to the home list automatically.
         XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
         XCTAssertEqual(
             app.buttons.matching(identifier: "plan-start").count,

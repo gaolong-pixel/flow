@@ -5,6 +5,7 @@ struct PlanHomeView: View {
     @EnvironmentObject private var runCoordinator: RunCoordinator
     @State private var plans: [Routine] = []
     @State private var editing: Routine?
+    @State private var editingIsNew = false
     @State private var setupPlan: Routine?
     @State private var setupMessage: String?
     @State private var errorMessage: String?
@@ -62,8 +63,9 @@ struct PlanHomeView: View {
                     }
                 )
             } else if let editing {
-                FlowRootView(routine: editing, store: store) {
+                FlowRootView(routine: editing, isNew: editingIsNew, store: store) {
                     self.editing = nil
+                    self.editingIsNew = false
                     reload()
                 }
             } else if let setupPlan {
@@ -85,6 +87,7 @@ struct PlanHomeView: View {
                         self.setupMessage = nil
                         self.isLaunching = false
                         self.editing = plan
+                        self.editingIsNew = false
                     },
                     onDelete: {
                         let plan = setupPlan
@@ -297,7 +300,7 @@ struct PlanHomeView: View {
 
     private func reload() {
         do {
-            plans = try store.loadAll()
+            plans = try store.loadAll().filter { !$0.steps.isEmpty }
             errorMessage = nil
         } catch {
             errorMessage = "读取计划失败"
@@ -306,13 +309,10 @@ struct PlanHomeView: View {
 
     private func create() {
         guard let plan = try? RoutineDraft.new(name: "未命名计划").toRoutine() else { return }
-        do {
-            try store.save(plan)
-            reload()
-            editing = plan
-        } catch {
-            errorMessage = "保存计划失败"
-        }
+        // Do not write a new plan until the editor explicitly saves a draft
+        // with at least one valid node.
+        editing = plan
+        editingIsNew = true
     }
 
     private func delete(_ plan: Routine) {
@@ -416,17 +416,24 @@ struct FlowRootView: View {
     @StateObject private var model: FlowEditorModel
     private let store: PlanStore?
 
-    init(routine: Routine? = nil, store: PlanStore? = nil, onBack: @escaping () -> Void = {}) {
+    init(
+        routine: Routine? = nil,
+        isNew: Bool = false,
+        store: PlanStore? = nil,
+        onBack: @escaping () -> Void = {}
+    ) {
         self.onBack = onBack
         self.store = store
+        let persist: (Routine) throws -> Void = { plan in
+            try store?.save(plan)
+            if isNew {
+                onBack()
+            }
+        }
         if let routine, let draft = try? RoutineDraft.from(routine) {
-            _model = StateObject(wrappedValue: FlowEditorModel(draft: draft) { plan in
-                try store?.save(plan)
-            })
+            _model = StateObject(wrappedValue: FlowEditorModel(draft: draft, persist: persist))
         } else {
-            _model = StateObject(wrappedValue: FlowEditorModel(draft: nil) { plan in
-                try store?.save(plan)
-            })
+            _model = StateObject(wrappedValue: FlowEditorModel(draft: nil, persist: persist))
         }
     }
     @State private var showRestoreConfirmation = false
@@ -654,10 +661,20 @@ struct FlowRootView: View {
             Rectangle()
                 .fill(FlowPalette.outline)
                 .frame(height: 1)
+            if !model.canSave {
+                Text("至少添加一个节点后才能保存流程。")
+                    .flowFont(11)
+                    .foregroundColor(FlowPalette.invalid)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
             Button("保存流程") {
                 model.savePlan()
             }
             .buttonStyle(FlowPrimaryButtonStyle())
+            .disabled(!model.canSave)
+            .opacity(model.canSave ? 1 : 0.45)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .accessibilityIdentifier("editor-save-top")
@@ -741,6 +758,8 @@ struct FlowRootView: View {
                         .clipShape(RoundedRectangle(cornerRadius: FlowMetrics.buttonRadius, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .disabled(!model.canSave)
+                .opacity(model.canSave ? 1 : 0.45)
                 .accessibilityIdentifier("editor-save")
 
                 Button {

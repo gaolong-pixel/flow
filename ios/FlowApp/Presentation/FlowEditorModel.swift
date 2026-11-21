@@ -20,6 +20,15 @@ final class FlowEditorModel: ObservableObject {
 
     private let persist: ((Routine) throws -> Void)?
 
+    /// Draft saving is only legal once at least one valid node exists.
+    var canSave: Bool {
+        guard let state else { return false }
+        if state.mode == .text {
+            return !state.hasBlockingErrors && !state.parseResult.steps.isEmpty
+        }
+        return !state.draft.steps.isEmpty
+    }
+
     init(draft: RoutineDraft? = nil, persist: ((Routine) throws -> Void)? = nil) {
         self.persist = persist
         let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
@@ -72,6 +81,14 @@ final class FlowEditorModel: ObservableObject {
 
     func savePlan() {
         guard let controller else { return }
+        guard canSave else {
+            notice = UiNotice(
+                message: "至少添加一个节点后才能保存流程。",
+                isError: true
+            )
+            modeMessage = nil
+            return
+        }
 
         switch controller.rename(planName) {
         case .failure(let error, let resultState):

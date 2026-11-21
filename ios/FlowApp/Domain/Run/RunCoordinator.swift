@@ -161,31 +161,6 @@ final class RunCoordinator: ObservableObject {
         return true
     }
 
-    /// Explicitly skips the current node through the scheduler extension.
-    @discardableResult
-    func skipCurrent() -> Bool {
-        guard let active = controller else { return false }
-        let before = active.snapshot()
-        guard active.skipCurrent() else { return false }
-        if before.node?.type == .timer, before.nodeState != .ready {
-            notifications.onTimerPaused(before)
-        }
-        drainHaptics(active)
-        let snapshot = active.snapshot()
-        if snapshot.finalized {
-            guard let summary = active.finishedSummary() else { return false }
-            controller = nil
-            alertedTimerRunID = nil
-            expiryFeedbackToken = nil
-            notifications.onRunFinished(summary)
-            runtime = .finished(summary)
-            return true
-        }
-        publish(snapshot)
-        notifications.onProgress(snapshot)
-        return true
-    }
-
     @discardableResult
     func pause() -> Bool {
         guard let active = controller else { return false }
@@ -241,31 +216,6 @@ final class RunCoordinator: ObservableObject {
         }
         publish(snapshot)
         notifications.onProgress(snapshot)
-        return true
-    }
-
-    /// After the last executable node is completed, the controller waits if
-    /// skipped nodes remain. This resumes the first skipped node.
-    @discardableResult
-    func resumeSkippedAfterReview() -> Bool {
-        guard let active = controller, active.resumeSkippedAfterReview() else { return false }
-        drainHaptics(active)
-        let snapshot = active.snapshot()
-        publish(snapshot)
-        notifications.onProgress(snapshot)
-        return true
-    }
-
-    /// Ends the run after the skipped-nodes prompt, preserving the summary.
-    @discardableResult
-    func finishAfterSkippedReview() -> Bool {
-        guard let active = controller, active.finishAfterSkippedReview() else { return false }
-        guard let summary = active.finishedSummary() else { return false }
-        controller = nil
-        alertedTimerRunID = nil
-        expiryFeedbackToken = nil
-        notifications.onRunFinished(summary)
-        runtime = .finished(summary)
         return true
     }
 

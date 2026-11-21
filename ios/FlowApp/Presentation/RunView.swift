@@ -43,11 +43,6 @@ struct RunView: View {
             }
             CompletionFlashView(progress: completionFlash)
                 .allowsHitTesting(false)
-            if snapshot.awaitingSkippedDecision {
-                skippedReviewOverlay
-                    .transition(.opacity)
-                    .zIndex(5)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -101,82 +96,8 @@ struct RunView: View {
         }
     }
 
-    private var skippedReviewOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.62)
-                .ignoresSafeArea()
-
-            VStack(spacing: 14) {
-                Text("已经到最后一步啦")
-                    .flowFont(21, weight: .semibold)
-                    .foregroundColor(FlowPalette.runText)
-                Text("之前还有 \(snapshot.skippedNodes) 个节点被跳过，是否回去完成？")
-                    .flowFont(14)
-                    .foregroundColor(FlowPalette.runSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("选择「直接结束」会保留跳过记录并直接进入结果页。")
-                    .flowFont(11)
-                    .foregroundColor(FlowPalette.runMutedText)
-                    .multilineTextAlignment(.center)
-
-                VStack(spacing: 9) {
-                    Button {
-                        _ = coordinator.resumeSkippedAfterReview()
-                    } label: {
-                        Text("去完成跳过节点")
-                            .flowFont(15, weight: .semibold)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(FlowPalette.primaryBright)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("skipped-review-resume")
-
-                    Button {
-                        _ = coordinator.finishAfterSkippedReview()
-                    } label: {
-                        Text("直接结束")
-                            .flowFont(14, weight: .medium)
-                            .foregroundColor(FlowPalette.runSecondaryText)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(FlowPalette.runSurfaceRaised)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("直接结束并查看结果")
-                    .accessibilityIdentifier("skipped-review-finish")
-                }
-                .padding(.top, 4)
-            }
-            .padding(24)
-            .frame(maxWidth: 340)
-            .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(FlowPalette.runSurface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(FlowPalette.runOutline, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
-        }
-        .accessibilityIdentifier("skipped-review-overlay")
-    }
-
     private var exitMessage: String {
-        var message = "当前进度：已完成 \(snapshot.completedNodes) / \(snapshot.totalNodes) 个节点。"
-        if snapshot.skippedNodes > 0 {
-            message += " 本次已跳过 \(snapshot.skippedNodes) 个节点，不计入完成。"
-        }
-        return message + "退出后当前节点状态、计时和完成进度都会丢弃，不会保存。"
+        "当前进度：已完成 \(snapshot.completedNodes) / \(snapshot.totalNodes) 个节点。退出后当前节点状态、计时和完成进度都会丢弃，不会保存。"
     }
 
     // MARK: - Header
@@ -279,11 +200,6 @@ struct RunView: View {
                                 ? FlowPalette.runSecondaryText
                                 : FlowPalette.runText
                         )
-                    if !snapshot.skippedNodeIndices.isEmpty {
-                        Text("已跳过 \(snapshot.skippedNodeIndices.count)")
-                            .flowFont(10)
-                            .foregroundColor(FlowPalette.warm)
-                    }
                     Spacer()
                     Text(completedExpanded ? "收起" : "展开")
                         .flowFont(10)
@@ -309,11 +225,7 @@ struct RunView: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         if snapshot.completedNodeIndices.isEmpty {
-                            Text(
-                                snapshot.skippedNodeIndices.isEmpty
-                                    ? "还没有已完成节点。完成当前节点后会收进这里。"
-                                    : "跳过节点仍保留在上方滚筒中，不计入完成。"
-                            )
+                            Text("还没有已完成节点。完成当前节点后会收进这里。")
                             .flowFont(10.5)
                             .foregroundColor(FlowPalette.runMutedText)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -474,8 +386,6 @@ struct RunView: View {
         if let step = snapshot.plan.steps[safe: index] {
             if index == snapshot.nodeIndex {
                 currentNodeCard(step: step, index: index)
-            } else if snapshot.nodeStatuses[safe: index] == .skipped {
-                skippedNodeCard(step: step, index: index)
             } else {
                 compactNodeButton(step: step, index: index)
             }
@@ -575,61 +485,12 @@ struct RunView: View {
         .accessibilityIdentifier("run-current-node")
     }
 
-    private func skippedNodeCard(step: RoutineStep, index: Int) -> some View {
-        let typeColor = step.type == .timer ? FlowPalette.warm : FlowPalette.primaryBright
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-
-        return Button {
-            FlowHaptics.tick()
-            _ = coordinator.selectNode(index)
-        } label: {
-            HStack(spacing: 11) {
-                ZStack {
-                    Circle().fill(typeColor.opacity(0.07))
-                    FlowTypeGlyph(type: step.type, size: 13, onDark: true)
-                        .opacity(0.65)
-                }
-                .frame(width: 30, height: 30)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(step.name)
-                        .flowFont(14, weight: .medium)
-                        .foregroundColor(FlowPalette.runSecondaryText)
-                        .lineLimit(1)
-                    Text(compactMeta(step: step, remainingMs: nil))
-                        .flowFont(9.5)
-                        .foregroundColor(FlowPalette.runMutedText)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text(step.type == .timer ? "TIMER" : "COUNT")
-                        .flowFont(8, weight: .semibold)
-                        .tracking(0.5)
-                        .foregroundColor(typeColor.opacity(0.55))
-                    Text("已跳过 · 可继续")
-                        .flowFont(9.5, weight: .medium)
-                        .foregroundColor(FlowPalette.warm)
-                }
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(FlowPalette.warm.opacity(0.045))
-            .overlay(shape.stroke(FlowPalette.warm.opacity(0.20), lineWidth: 1))
-            .clipShape(shape)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("run-node-\(index)")
-        .accessibilityLabel("切换到节点 \(step.name)，已跳过，可继续")
-    }
-
     private func compactNodeButton(step: RoutineStep, index: Int) -> some View {
-        let deferred = snapshot.nodeStatuses[safe: index] == .deferred
+        let statusValue = snapshot.nodeStatuses[safe: index] ?? .pending
+        let deferred = statusValue == .deferred || statusValue == .skipped
         let typeColor = step.type == .timer ? FlowPalette.warm : FlowPalette.primaryBright
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        let status = compactStatusLabel(snapshot.nodeStatuses[safe: index] ?? .pending)
+        let status = compactStatusLabel(statusValue)
 
         return Button {
             FlowHaptics.tick()
@@ -737,20 +598,6 @@ struct RunView: View {
 
                 Spacer()
 
-                dockTextButton(
-                    "跳过",
-                    identifier: "run-skip",
-                    accessibilityLabel: snapshot.hasSelectableNode
-                        ? "跳过当前节点"
-                        : "没有其他待执行节点，无法跳过",
-                    enabled: snapshot.hasSelectableNode
-                ) {
-                    FlowHaptics.tick()
-                    _ = coordinator.skipCurrent()
-                }
-                Circle()
-                    .fill(Color.white.opacity(0.18))
-                    .frame(width: 3, height: 3)
                 dockTextButton("结束", identifier: "run-end", accessibilityLabel: "结束流程") {
                     showExitConfirmation = true
                 }
@@ -775,7 +622,7 @@ struct RunView: View {
             .padding(.top, 8)
 
             Text(needsSecondaryComplete
-                ? "完成会记录本节点；跳过不会计入完成"
+                ? "完成会记录本节点；切换节点不会丢失进度"
                 : "点击上方节点可切换执行目标")
                 .flowFont(9.5)
                 .foregroundColor(FlowPalette.runMutedText)
@@ -986,7 +833,7 @@ struct RunView: View {
         case .deferred: return "暂缓"
         case .pending: return "待执行"
         case .completed: return "已完成"
-        case .skipped: return "已跳过"
+        case .skipped: return "暂缓"
         case .current: return "当前"
         }
     }

@@ -20,7 +20,8 @@ enum NodeRunState: String, Equatable {
 /// DEFERRED   - was started (or reached expiry) and the user deliberately
 ///              switched away. It stays executable and keeps its progress.
 /// COMPLETED  - counted as completed and removed from the execution roller.
-/// SKIPPED    - explicitly not done in this run. Never counted as completed.
+/// SKIPPED    - legacy scheduling value from older builds. No new skips are
+///              created; it is treated as a deferred, selectable node.
 enum NodeStatus: String, Equatable {
     case pending
     case current
@@ -47,9 +48,7 @@ struct PlanRunSnapshot: Equatable {
     let runStartedAtEpochMs: Int64
     let finalized: Bool
     var nodeStatuses: [NodeStatus] = []
-    var skippedNodes: Int = 0
     var nodeRemainingMs: [Int64?] = []
-    var awaitingSkippedDecision: Bool = false
 
     var node: RoutineStep? {
         plan.steps.indices.contains(nodeIndex) ? plan.steps[nodeIndex] : nil
@@ -76,8 +75,7 @@ struct PlanRunSnapshot: Equatable {
     }
 
     /// Node indexes that remain in the execution roller, in plan order.
-    /// Completed nodes leave the roller; skipped nodes stay visible as a
-    /// read-only record so the flow still reads as a whole.
+    /// Completed nodes leave the roller; all other nodes stay visible.
     var visibleNodeIndices: [Int] {
         plan.steps.indices.filter { index in
             guard nodeStatuses.indices.contains(index) else { return true }
@@ -88,12 +86,6 @@ struct PlanRunSnapshot: Equatable {
     var completedNodeIndices: [Int] {
         plan.steps.indices.filter {
             nodeStatuses.indices.contains($0) && nodeStatuses[$0] == .completed
-        }
-    }
-
-    var skippedNodeIndices: [Int] {
-        plan.steps.indices.filter {
-            nodeStatuses.indices.contains($0) && nodeStatuses[$0] == .skipped
         }
     }
 
@@ -146,11 +138,9 @@ final class PlanRunController {
     private var index = 0
     private var loop: Bool
     private var completed = 0
-    private var skipped = 0
     private var deadline: Int64?
     private var finalized = false
     private var exited = false
-    private var awaitingSkippedDecision = false
     private var timerRunId: Int64 = 0
 
     private var statuses: [NodeStatus]
@@ -227,11 +217,9 @@ final class PlanRunController {
             runStartedAtEpochMs: startedAtEpochMs,
             finalized: finalized,
             nodeStatuses: statuses,
-            skippedNodes: skipped,
             nodeRemainingMs: plan.steps.indices.map { position in
                 perNodeRemaining(position, now: monotonic.nowMs)
-            },
-            awaitingSkippedDecision: awaitingSkippedDecision
+            }
         )
     }
 
@@ -239,7 +227,7 @@ final class PlanRunController {
     /// fresh monotonic deadline for its full duration.
     @discardableResult
     func startNode() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision,
+        guard !finalized, !exited,
               state == .ready, statuses[index] == .current,
               let current = node else {
             return false
@@ -265,7 +253,7 @@ final class PlanRunController {
     /// and queues the one-shot haptic events. Idempotent; never completes.
     @discardableResult
     func refresh() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision,
+        guard !finalized, !exited,
               state == .running, statuses[index] == .current,
               let current = node else {
             return false
@@ -288,7 +276,7 @@ final class PlanRunController {
 
     @discardableResult
     func pause() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision,
+        guard !finalized, !exited,
               state == .running, statuses[index] == .current,
               let current = node else {
             return false
@@ -308,7 +296,7 @@ final class PlanRunController {
 
     @discardableResult
     func resume() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision,
+        guard !finalized, !exited,
               state == .paused, statuses[index] == .current else {
             return false
         }
@@ -330,7 +318,7 @@ final class PlanRunController {
     /// scrolling or view updates call this function; only an explicit tap does.
     @discardableResult
     func selectNode(_ targetIndex: Int) -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision,
+        guard !finalized, !exited,
               plan.steps.indices.contains(targetIndex),
               targetIndex != index else {
             return false
@@ -341,12 +329,6 @@ final class PlanRunController {
               targetStatus == .skipped else {
             return false
         }
-        if targetStatus == .skipped {
-            // Selecting a skipped node resumes it; it is no longer "currently
-            // skipped" from the flow's point of view.
-            skipped = max(0, skipped - 1)
-        }
-
         suspendCurrentForSwitch()
         index = targetIndex
         statuses[targetIndex] = .current
@@ -364,30 +346,6 @@ final class PlanRunController {
         return true
     }
 
-    /// Explicitly skips the current node in this run. It never counts towards
-    /// completedNodes; the node stays in the roller as SKIPPED and remains
-    /// selectable/resumable with its execution state and progress retained.
-    /// A running TIMER is frozen as PAUSED; a running COUNT keeps RUNNING; a
-    /// never-started node stays READY. The next PENDING/DEFERRED node becomes
-    /// current. If no executable node remains, the run finalizes normally.
-    @discardableResult
-    func skipCurrent() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision, node != nil else { return false }
-        // Skipping needs a different executable node to become current. If the
-        // current node is the last PENDING/DEFERRED target, keep it instead of
-        // ending the run and losing the skipped-node re-entry path.
-        guard hasOtherSelectableNode else { return false }
-        // Reuse the same suspend rules as an explicit target switch. This
-        // freezes a running TIMER and preserves its remaining time, while a
-        // COUNT keeps its RUNNING state.
-        suspendCurrentForSwitch()
-        statuses[index] = .skipped
-        skipped += 1
-        loop = false
-        advanceAfterRemoval()
-        return true
-    }
-
     /// Completes the current node.
     ///
     /// With loop enabled the current node is reset to READY (TIMER back to its
@@ -396,7 +354,7 @@ final class PlanRunController {
     /// selectable node becomes current without starting automatically.
     @discardableResult
     func completeNode() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision,
+        guard !finalized, !exited,
               let current = node else { return false }
         let allowed: Bool
         switch current.type {
@@ -433,14 +391,14 @@ final class PlanRunController {
     /// Loop changes never advance, reset or count the node by themselves.
     @discardableResult
     func setLoop(_ enabled: Bool) -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision else { return false }
+        guard !finalized, !exited else { return false }
         loop = enabled
         return true
     }
 
     @discardableResult
     func toggleLoop() -> Bool {
-        guard !finalized, !exited, !awaitingSkippedDecision else { return false }
+        guard !finalized, !exited else { return false }
         loop.toggle()
         return true
     }
@@ -454,34 +412,6 @@ final class PlanRunController {
         remaining = nil
         activeTimerRunId = nil
         return summaryLocked(completedNormally: false)
-    }
-
-    /// The user chose to go back to a skipped node after the last executable
-    /// node completed. Restores the first skipped node as current.
-    @discardableResult
-    func resumeSkippedAfterReview() -> Bool {
-        guard !finalized, !exited, awaitingSkippedDecision else { return false }
-        guard let target = statuses.indices.first(where: {
-            statuses[$0] == .skipped
-        }) else { return false }
-        awaitingSkippedDecision = false
-        index = target
-        statuses[target] = .current
-        skipped = max(0, skipped - 1)
-        deadline = nil
-        loop = false
-        if states[target] == .running && plan.steps[target].type == .timer {
-            states[target] = .paused
-        }
-        return true
-    }
-
-    /// The user chose to end the run while skipped nodes remain.
-    @discardableResult
-    func finishAfterSkippedReview() -> Bool {
-        guard !exited, awaitingSkippedDecision else { return false }
-        finalizeLocked()
-        return true
     }
 
     /// Summary after normal completion. Nil if not finalized.
@@ -534,15 +464,6 @@ final class PlanRunController {
                 statuses[candidate] == .pending || statuses[candidate] == .deferred
             }
         guard let next = next else {
-            if let skippedIndex = statuses.indices.first(where: {
-                statuses[$0] == .skipped
-            }) {
-                // Do not end the run yet: the user still has skipped nodes
-                // available to resume. The UI asks whether to go back.
-                awaitingSkippedDecision = true
-                index = skippedIndex
-                return
-            }
             finalizeLocked()
             return
         }
@@ -554,7 +475,6 @@ final class PlanRunController {
     }
 
     private func finalizeLocked() {
-        awaitingSkippedDecision = false
         finalized = true
         states[index] = .ready
         remaining = nil
@@ -612,7 +532,7 @@ final class PlanRunController {
             totalNodes: plan.steps.count,
             elapsedMs: max(0, wallClock.nowEpochMs - startedAtEpochMs),
             completedNormally: completedNormally,
-            skippedNodes: skipped
+            skippedNodes: 0
         )
     }
 

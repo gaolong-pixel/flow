@@ -399,28 +399,6 @@ class RunCoordinatorTest {
     }
 
     @Test
-    fun skipKeepsNodeVisibleInTheRollerSnapshot() {
-        val coordinator = coordinator()
-        start(coordinator.start(plan(count(id = "c1"), count(id = "c2")), false))
-        assertTrue(coordinator.startNode())
-        assertTrue(coordinator.skipCurrent())
-
-        val snapshot = (coordinator.runtime.value as RunRuntimeState.Active).snapshot
-        assertEquals(1, snapshot.nodeIndex)
-        assertEquals(NodeStatus.SKIPPED, snapshot.nodeStatuses[0])
-        assertEquals(listOf(0, 1), snapshot.visibleNodeIndices)
-        assertEquals(0, snapshot.completedNodes)
-        assertEquals(1, snapshot.skippedNodes)
-
-        // A skipped node can be selected again through the official entry.
-        assertTrue(coordinator.selectNode(0))
-        val resumed = (coordinator.runtime.value as RunRuntimeState.Active).snapshot
-        assertEquals(0, resumed.nodeIndex)
-        assertEquals(NodeStatus.CURRENT, resumed.nodeStatuses[0])
-        assertEquals(0, resumed.skippedNodes)
-    }
-
-    @Test
     fun selectNodeDefersPreviousAndCancelsTimerNotification() {
         val coordinator = coordinator()
         clock.now = 0L
@@ -463,48 +441,6 @@ class RunCoordinatorTest {
         assertEquals(NodeRunState.PAUSED, restored.nodeState)
         assertEquals(20_000L, restored.remainingMs)
         assertTrue(coordinator.resume())
-    }
-
-    @Test
-    fun skipCurrentRejectsLastActiveNodeAndCompletingItKeepsSkippedSummary() {
-        val coordinator = coordinator()
-        start(coordinator.start(plan(count(id = "c1"), count(id = "c2")), false))
-        assertTrue(coordinator.skipCurrent())
-        val mid = (coordinator.runtime.value as RunRuntimeState.Active).snapshot
-        assertEquals(0, mid.completedNodes)
-        assertEquals(1, mid.skippedNodes)
-
-        // c2 is the only remaining active node; keeping it avoids ending the
-        // run and losing the skipped-node re-entry path.
-        assertFalse(coordinator.skipCurrent())
-        assertTrue(coordinator.startNode())
-        assertTrue(coordinator.completeNode())
-        val awaiting = (coordinator.runtime.value as RunRuntimeState.Active).snapshot
-        assertTrue(awaiting.awaitingSkippedDecision)
-        assertFalse(awaiting.finalized)
-
-        assertTrue(coordinator.finishAfterSkippedReview())
-        val finished = coordinator.runtime.value as RunRuntimeState.Finished
-        assertEquals(1, finished.summary.completedNodes)
-        assertEquals(1, finished.summary.skippedNodes)
-        assertTrue(finished.summary.completedNormally)
-        assertTrue(notifications.events.contains("finished"))
-    }
-
-    @Test
-    fun skippingTimerCancelsNotificationWithoutCompletingIt() {
-        val coordinator = coordinator()
-        clock.now = 0L
-        start(coordinator.start(plan(timer(ms = 10_000L), count(id = "c2")), false))
-        assertTrue(coordinator.startNode())
-        clock.advance(2_000L)
-        assertTrue(coordinator.skipCurrent())
-
-        val snapshot = (coordinator.runtime.value as RunRuntimeState.Active).snapshot
-        assertEquals(NodeStatus.SKIPPED, snapshot.nodeStatuses[0])
-        assertEquals(0, snapshot.completedNodes)
-        assertFalse(notifications.events.contains("timerCompleted"))
-        assertTrue(notifications.events.contains("timerPaused"))
     }
 
     @Test

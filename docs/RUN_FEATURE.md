@@ -5,11 +5,12 @@
 ## 0. 2026-11-21 执行滚筒 v2
 
 - 运行页从单节点全屏改为纵向 3D 流程滚筒：当前节点展开，其他待执行/暂缓节点紧凑排列，按与视口的距离做缩放、透明度、旋转和透视。
-- 调度扩展：每个节点有 `PENDING / CURRENT / DEFERRED / COMPLETED / SKIPPED` 调度状态；`selectNode` 在不丢失进度的前提下切换执行目标。
+- 调度扩展：每个节点有 `PENDING / CURRENT / DEFERRED / COMPLETED` 调度状态；`selectNode` 在不丢失进度的前提下切换执行目标。`SKIPPED` 仅作为旧内存快照的兼容值保留，不再产生新的跳过状态。
 - COUNT 保持“目标次数 + 开始/完成”语义，不做逐次计数；开始后显示为目标次数服务的平静呼吸等待，完成由用户主动点击。
 - 切换离开 RUNNING TIMER 时冻结剩余时间并标记暂缓；切回后恢复 PAUSED，由用户继续。
-- 完成节点移入默认折叠的“已完成”区域；跳过是独立操作，不计完成，但跳过节点继续留在滚筒中并标记“已跳过”，可以重新选择并恢复此前进度。
-- 运行页增加完成归档、跳过入口、流程进度、当前节点位置；结果页在存在跳过时显示“本次流程结束”和跳过数量，不显示完成彩纸。
+- 完成节点移入默认折叠的“已完成”区域；运行页不再提供独立跳过入口，节点切换由点击滚筒卡片完成，原节点自动暂停/保留进度。
+- 启动前倒计时改为「准备好了吗？」→ 3 → 2 → 1，约 4.6 秒；倒计时期间提供“取消”，取消只返回准备页，不启动 Session。
+- 新建流程先进入未保存草稿；至少添加一个有效节点后才允许保存，首页不会因打开创建页产生空流程。
 - 未新增进程级 Session 持久化；运行状态仍只在当前进程内。
 
 ## 0.1 2026-11-19 UI 修正
@@ -22,17 +23,16 @@
 ```text
 计划列表
   └─ 点击“开始” → 启动设置（不提供循环选择）
-       └─ 开始运行 → 纵向 3D 滚筒运行页
+       └─ 开始运行 → 「准备好了吗？」→ 3 → 2 → 1（约 4.6 秒）→ 纵向 3D 滚筒运行页
             ├─ 当前 COUNT：开始 → 平静呼吸等待 → 完成本节点
             ├─ 当前 TIMER：开始 → 倒计时 ⇄ 暂停/继续 → 提前完成 / 到期 → 完成本节点
             ├─ 点击其他待执行/暂缓节点 → 切换执行目标
             │    └─ 原 TIMER RUNNING → 冻结为 PAUSED + DEFERRED
             │    └─ 原 COUNT 保持 RUNNING；未开始的节点保持 PENDING
-            ├─ 跳过 → SKIPPED（不计完成，保留在滚筒中，可重新选择）
             ├─ 当前节点循环：开启后完成 → 重置当前节点（不计完成数）
             ├─ 已完成区域：折叠 / 展开；完成节点从滚筒移除
-            ├─ 退出 → 退出确认 → 已退出流程页（X/Y + 跳过数）→ 首页
-            └─ 所有可执行节点完成 → 有跳过节点则询问去完成/直接结束 → 结果页 → 首页
+            ├─ 退出 → 退出确认 → 已退出流程页（X/Y）→ 首页
+            └─ 所有节点完成 → 结果页 → 首页
 ```
 
 运行期间不提供编辑入口；计划列表在运行页背后不可达，退出/结束前不能启动第二个计划。
@@ -48,7 +48,7 @@
 - `RUNNING`：COUNT 已开始 / TIMER 已建立单调时钟 deadline。
 - `PAUSED`：TIMER 剩余时间冻结，继续时从剩余时间建立新 deadline。
 - `EXPIRED`：TIMER 归零；**不会自动完成节点**，必须用户点击“完成本节点”。
-- 所有可执行节点完成，或用户主动结束后运行结束；若最后一个可执行节点完成时仍有跳过节点，先提示「去完成跳过节点」或「直接结束」，选择去完成会恢复第一个跳过节点的进度。跳过节点在运行结束前始终保留在滚筒中并可重新选择。循环迭代不增加完成节点数，跳过也不计入完成数。
+- 所有节点完成，或用户主动结束后运行结束；循环迭代不增加完成节点数。
 - 每次启动默认循环关闭；启动设置不提供循环入口，运行页可随时开关。推进到下一节点时循环自动关闭（“循环只作用于当前节点”）。
 - 关闭循环本身不推进节点，不重置剩余时间；只有点击完成才推进。
 - 循环完成时：当前节点回到 `READY`，TIMER 重置为完整时长，COUNT 重新展示目标数量，不自动开始下一轮。
@@ -56,23 +56,23 @@
 
 ### 2.2 调度状态（流程级）
 
-- 调度状态：`PENDING`、`CURRENT`、`DEFERRED`、`COMPLETED`、`SKIPPED`。
+- 调度状态：`PENDING`、`CURRENT`、`DEFERRED`、`COMPLETED`；`SKIPPED` 是旧快照兼容值，不再由 UI/控制器产生。
 - 同一时刻只有一个 `CURRENT`；初始为第一个节点，恢复时按真实快照恢复，不重置到第一个。
 - 点击其他 `PENDING`/`DEFERRED` 节点调用 `selectNode`：
   - 原节点未开始 → 回到 `PENDING`；
   - 原 TIMER 正在运行 → 计算剩余时间、清除 deadline、置 `PAUSED`、调度状态 `DEFERRED`；
   - 原 COUNT 已开始 → 保留 `RUNNING`，调度状态 `DEFERRED`；
-  - 目标节点可以是 `PENDING / DEFERRED / SKIPPED`；恢复其保留的执行状态（TIMER `PAUSED` / `EXPIRED`，COUNT `RUNNING` / `READY`）。
+  - 目标节点可以是 `PENDING / DEFERRED`；若读取到旧值的 `SKIPPED`，按 `DEFERRED` 兼容处理并恢复其保留的执行状态（TIMER `PAUSED` / `EXPIRED`，COUNT `RUNNING` / `READY`）。
 - `completeNode`：标记 `COMPLETED`、完成数 +1、从滚筒移除；随后按计划顺序选择下一个 `PENDING`/`DEFERRED`（循环一圈），只设为当前，不自动开始。
-- `skipCurrent`：先按切换规则暂停/保留当前执行状态，再标记 `SKIPPED`、跳过数 +1、不计完成；跳过节点继续留在滚筒中显示为“已跳过 · 可继续”，之后可重新选择并恢复进度。若当前是最后一个 `PENDING/DEFERRED` 节点，跳过被拒绝（UI 禁用跳过），避免流程结束导致跳过节点失去入口。
+- 切换节点：运行中的 TIMER 冻结为 `PAUSED` 并标记 `DEFERRED`；已开始的 COUNT 保留 `RUNNING`；未开始的节点回到 `PENDING`。切换不会完成节点，也不会丢失进度。
 - 循环只作用于当前节点；循环重置把 TIMER 恢复完整时长。切换节点会关闭循环（与原有“循环只作用于当前节点”一致）。
-- 运行快照新增 `nodeStatuses`、`nodeRemainingMs`、`skippedNodes`；`RunSummary` 新增 `skippedNodes`（默认 0）。
+- 运行快照新增 `nodeStatuses`、`nodeRemainingMs`；`RunSummary.skippedNodes` 仅作为兼容字段保留并恒为 0。
 
 单调时钟：
 - Android `SystemClock.elapsedRealtime()`；iOS `mach_continuous_time()`。
 - 剩余时间始终由 deadline 派生；UI ticker 只触发重新计算/重绘，不是时间来源。
 - App 回到前台、后台服务 tick、用户操作都会重新计算；暂停冻结、继续恢复。
-- wall clock 仍保留在 RunSummary 中用于真实用时；结果页展示真实完成节点数、跳过数和用时，不伪造每节点统计。
+- wall clock 仍保留在 RunSummary 中用于真实用时；结果页展示真实完成节点数和用时，不伪造每节点统计。
 
 ## 3. 双端结构
 
@@ -133,19 +133,19 @@
 ## 8. 旧执行模型清理
 
 - 删除阶段七 `ExecutionSession`、`ExecutionScheduling`、`ExecutionController`、`ExecutionTimerEngine` 及对应测试。
-- 运行功能不使用旧 Scheduler/records；本轮的 `NodeStatus` 与 `skipCurrent` 只是运行控制器内部的最小调度扩展，不恢复阶段七的自动推进/执行记录模型。
+- 运行功能不使用旧 Scheduler/records；本轮的 `NodeStatus` 与 `selectNode` 只是运行控制器内部的最小调度扩展，不恢复阶段七的自动推进/执行记录模型。
 - 计划编辑/文本解析契约保留：`x N`、`[计数=完成]`、`[分类=休息]` 仍被解析器接受以兼容历史输入；计划 JSON 和运行逻辑只使用 COUNT 目标、TIMER 时长。
 - 保留独立的单调时钟与计时思路，但新实现是运行控制器内部的最小 deadline 逻辑，不复用旧 TimerEngine。
 
 ## 9. 测试与验证
 
-- Android JVM（174 tests / 0 failures）：`PlanRunControllerTest`、`RunCoordinatorTest`、`RunFormattingTest` 覆盖状态转换、COUNT/TIMER、暂停/继续/到期、循环、退出统计、单实例、通知回调、后台生命周期、不持久化、Parser 共享用例，以及本轮新增的调度状态、切换/暂缓、跳过保留、归档选择回绕、到期 token 一次性。
-- iOS XCTest（168 tests / 0 failures）：对应 `PlanRunControllerTests`、`RunCoordinatorTests`、`RunNotificationSinkTests`、`RunFormattingTests`，新增用例与 Android 同构。
+- Android JVM（168 tests / 0 failures）：`PlanRunControllerTest`、`RunCoordinatorTest`、`RunFormattingTest`、`PlanStoreTest` 覆盖状态转换、COUNT/TIMER、暂停/继续/到期、循环、退出统计、单实例、通知回调、后台生命周期、不持久化、Parser 共享用例、节点切换进度、空流程拒绝等。
+- iOS XCTest（162 tests / 0 failures）：对应 `PlanRunControllerTests`、`RunCoordinatorTests`、`RunNotificationSinkTests`、`RunFormattingTests`、`PlanStoreTests`，新增用例与 Android 同构。
 - iOS XCUITest（最终 9 tests / 0 failures）：
-  - `FlowRunFlowUITests`：既有两计划全链路、启动倒计时、新增 `testSkippedReviewCanGoBackAndComplete`（最后一个活动节点完成后去完成跳过节点）、 `testRollerSchedulingAndScreenshots`（初始滚筒、COUNT 目标等待、切换暂缓、TIMER 当前、完成归档折叠/展开）、`testSkippedNodeCanBeReselectedAndCompleted`（跳过、重新选择并恢复 RUNNING、最后活动跳过禁用、跳过节点回顾、直接结束结果页）、`testTimerExpiryFeedbackInForeground`（前台到期反馈）。
-  - `FlowPlanNamingUITests`：流程命名/删除确认。
-  - `FlowTimerNotificationUITests`：后台 2 秒 TIMER，验证系统本地通知实际到达，回到前台显示到期且不自动完成。
-- Android 模拟器（API 37）：ADB 人工走查初始滚筒、COUNT 目标等待、切换 TIMER、暂停/恢复、完成归档折叠/展开、跳过保留、到期、前后台剩余时间与暂停冻结。
+  - `FlowRunFlowUITests`：两计划全链路、启动倒计时取消/单次启动、滚筒切换/COUNT/TIMER/归档、前台到期反馈。
+  - `FlowPlanNamingUITests`：命名/删除、空草稿不建流程、已有流程清空后不能保存且取消不破坏原数据。
+  - `FlowTimerNotificationUITests`：后台 2 秒 TIMER，验证本地通知实际到达。
+- Android 模拟器（API 37）：ADB 人工走查启动倒计时/取消、初始滚筒、COUNT 目标等待、切换节点、暂停/恢复、完成归档、空草稿退出不建流程、添加节点后保存、编辑删除全部节点时保存禁用且退出保留原计划。
 - 验证证据：`artifacts/ui-roller-v2-20261121/`（不随源码提交）。
 
 ## 10. 已知限制
@@ -155,6 +155,6 @@
 - iOS 不做永久后台；进程被杀后的本地通知无法立即撤销，只能在下一次启动清理。
 - 通知权限被拒绝时，后台提醒不可用（前台功能不受影响）。
 - 运行结果不持久化，退出/结束后无法恢复；进程被杀后没有 Session 恢复。这是当前架构的既有明确边界，本轮没有新增持久化。
-- COUNT 没有独立的“暂停”执行状态，也不提供逐次计数；它是目标次数 + 开始/完成节点。切换或跳过时保留 RUNNING 执行状态；TIMER 的暂停/继续语义保持不变。
+- COUNT 没有独立的“暂停”执行状态，也不提供逐次计数；它是目标次数 + 开始/完成节点。切换节点时保留 RUNNING 执行状态；TIMER 的暂停/继续语义保持不变。
 - 执行历史和卡片拖拽排序不在本次范围；流程名称编辑已支持。
 - iOS 模拟器不提供真实触觉；Android 模拟器无真实马达。触觉触发路径由单元测试和平台 API 验证，手感需真机验收。

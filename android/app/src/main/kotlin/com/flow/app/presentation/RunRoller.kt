@@ -186,7 +186,6 @@ fun RunCompletedDrawer(
     modifier: Modifier = Modifier
 ) {
     val completed = snapshot.completedNodeIndices
-    val skipped = snapshot.skippedNodeIndices
     val shape = RoundedCornerShape(13.dp)
 
     Column(modifier.fillMaxWidth().padding(horizontal = FlowSpacing.page)) {
@@ -220,14 +219,6 @@ fun RunCompletedDrawer(
                 fontWeight = FontWeight.Medium,
                 color = if (completed.isEmpty()) FlowRunSecondaryText else FlowRunText
             )
-            if (skipped.isNotEmpty()) {
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "已跳过 ${skipped.size}",
-                    fontSize = 10.sp,
-                    color = FlowWarm
-                )
-            }
             Spacer(Modifier.weight(1f))
             Text(
                 text = if (expanded) "收起" else "展开",
@@ -261,11 +252,7 @@ fun RunCompletedDrawer(
             ) {
                 if (completed.isEmpty()) {
                     Text(
-                        text = if (skipped.isNotEmpty()) {
-                            "跳过节点仍保留在上方滚筒中，不计入完成。"
-                        } else {
-                            "还没有已完成节点。完成当前节点后会收进这里。"
-                        },
+                        text = "还没有已完成节点。完成当前节点后会收进这里。",
                         fontSize = 10.5.sp,
                         color = FlowRunMutedText,
                         lineHeight = 15.sp
@@ -612,8 +599,7 @@ private fun CompactNodeCard(
 ) {
     val isTimer = step.type == StepType.TIMER
     val typeColor = if (isTimer) FlowRunTimerType else FlowRunCountType
-    val deferred = status == NodeStatus.DEFERRED
-    val skipped = status == NodeStatus.SKIPPED
+    val deferred = status == NodeStatus.DEFERRED || status == NodeStatus.SKIPPED
     val selectable = status == NodeStatus.PENDING ||
         status == NodeStatus.DEFERRED ||
         status == NodeStatus.SKIPPED
@@ -626,11 +612,7 @@ private fun CompactNodeCard(
                 onClick = onSelect
             )
             .semantics {
-                contentDescription = if (skipped) {
-                    "切换到节点 ${step.name}，已跳过，可继续"
-                } else {
-                    "切换到节点 ${step.name}，${compactStatusLabel(status)}"
-                }
+                contentDescription = "切换到节点 ${step.name}，${compactStatusLabel(status)}"
                 role = Role.Button
             }
     } else {
@@ -644,19 +626,13 @@ private fun CompactNodeCard(
             .fillMaxWidth()
             .clip(shape)
             .background(
-                when {
-                    skipped -> FlowWarm.copy(alpha = 0.045f)
-                    deferred -> FlowWarm.copy(alpha = 0.055f)
-                    else -> Color.White.copy(alpha = 0.035f)
-                }
+                if (deferred) FlowWarm.copy(alpha = 0.055f)
+                else Color.White.copy(alpha = 0.035f)
             )
             .border(
                 1.dp,
-                when {
-                    skipped -> FlowWarm.copy(alpha = 0.20f)
-                    deferred -> FlowWarm.copy(alpha = 0.24f)
-                    else -> Color.White.copy(alpha = 0.065f)
-                },
+                if (deferred) FlowWarm.copy(alpha = 0.24f)
+                else Color.White.copy(alpha = 0.065f),
                 shape
             )
             .then(interaction)
@@ -667,7 +643,7 @@ private fun CompactNodeCard(
             modifier = Modifier
                 .size(30.dp)
                 .clip(CircleShape)
-                .background(typeColor.copy(alpha = if (skipped) 0.05f else 0.10f)),
+                .background(typeColor.copy(alpha = if (deferred) 0.06f else 0.10f)),
             contentAlignment = Alignment.Center
         ) {
             FlowTypeGlyph(
@@ -682,7 +658,7 @@ private fun CompactNodeCard(
                 text = step.name,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (skipped) FlowRunSecondaryText else FlowRunText,
+                color = if (deferred) FlowRunSecondaryText else FlowRunText,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -690,11 +666,7 @@ private fun CompactNodeCard(
             Text(
                 text = compactMeta(
                     step = step,
-                    remainingMs = if (status == NodeStatus.DEFERRED) {
-                        snapshot.remainingFor(index)
-                    } else {
-                        null
-                    }
+                    remainingMs = if (deferred) snapshot.remainingFor(index) else null
                 ),
                 fontSize = 9.5.sp,
                 color = FlowRunMutedText,
@@ -708,19 +680,15 @@ private fun CompactNodeCard(
                 text = if (isTimer) "TIMER" else "COUNT",
                 fontSize = 8.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = typeColor.copy(alpha = if (skipped) 0.45f else 0.90f),
+                color = typeColor.copy(alpha = if (deferred) 0.55f else 0.90f),
                 letterSpacing = 0.5.sp
             )
             Spacer(Modifier.height(3.dp))
             Text(
-                text = if (skipped) "已跳过 · 可继续" else compactStatusLabel(status),
+                text = compactStatusLabel(status),
                 fontSize = 9.5.sp,
                 fontWeight = FontWeight.Medium,
-                color = when {
-                    skipped -> FlowWarm
-                    deferred -> FlowWarm
-                    else -> FlowRunSecondaryText
-                }
+                color = if (deferred) FlowWarm else FlowRunSecondaryText
             )
         }
     }
@@ -730,7 +698,7 @@ private fun compactStatusLabel(status: NodeStatus): String = when (status) {
     NodeStatus.DEFERRED -> "暂缓"
     NodeStatus.PENDING -> "待执行"
     NodeStatus.COMPLETED -> "已完成"
-    NodeStatus.SKIPPED -> "已跳过"
+    NodeStatus.SKIPPED -> "暂缓"
     NodeStatus.CURRENT -> "当前"
 }
 
@@ -1118,7 +1086,6 @@ fun RunBottomDock(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onComplete: () -> Unit,
-    onSkip: () -> Unit,
     onToggleLoop: (Boolean) -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier
@@ -1169,24 +1136,6 @@ fun RunBottomDock(
                 )
             }
             Spacer(Modifier.weight(1f))
-            DockTextAction(
-                label = "跳过",
-                accessibilityLabel = if (snapshot.hasSelectableNode) {
-                    "跳过当前节点"
-                } else {
-                    "没有其他待执行节点，无法跳过"
-                },
-                testTag = "run-skip",
-                enabled = snapshot.hasSelectableNode,
-                onClick = onSkip
-            )
-            Spacer(Modifier.width(2.dp))
-            Box(
-                Modifier
-                    .size(3.dp)
-                    .background(Color.White.copy(alpha = 0.18f), CircleShape)
-            )
-            Spacer(Modifier.width(2.dp))
             DockTextAction(
                 label = "结束",
                 accessibilityLabel = "结束流程",
@@ -1281,7 +1230,7 @@ fun RunBottomDock(
         ) {
             Text(
                 text = if (secondaryComplete) {
-                    "完成会记录本节点；跳过不会计入完成"
+                    "完成会记录本节点；切换节点不会丢失进度"
                 } else {
                     "点击上方节点可切换执行目标"
                 },
@@ -1337,13 +1286,12 @@ private fun DockTextAction(
     label: String,
     accessibilityLabel: String,
     testTag: String,
-    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(9.dp))
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(onClick = onClick)
             .padding(horizontal = 9.dp, vertical = 6.dp)
             .testTag(testTag)
             .semantics {
@@ -1355,7 +1303,7 @@ private fun DockTextAction(
         Text(
             text = label,
             fontSize = 10.5.sp,
-            color = if (enabled) FlowRunSecondaryText else FlowRunMutedText.copy(alpha = 0.45f)
+            color = FlowRunSecondaryText
         )
     }
 }

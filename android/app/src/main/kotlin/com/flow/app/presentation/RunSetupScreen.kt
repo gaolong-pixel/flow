@@ -110,29 +110,26 @@ fun RunSetupScreen(
 
     fun beginLaunch() {
         if (launching || startRequested) return
-        if (reduceMotion) {
-            finishLaunch()
-            return
-        }
+
         launching = true
         stage = FlowLaunchStage.Ready
         onLaunchingChanged(true)
         haptics.tick()
         job = scope.launch {
-            delay(280L)
+            delay(1_000L)
             stage = FlowLaunchStage.Three
             haptics.tick()
-            delay(330L)
+            delay(1_200L)
             stage = FlowLaunchStage.Two
             haptics.tick()
-            delay(330L)
+            delay(1_200L)
             stage = FlowLaunchStage.One
             haptics.tick()
-            delay(330L)
-            stage = FlowLaunchStage.Go
-            haptics.commit()
-            delay(170L)
-            if (isActive) finishLaunch()
+            delay(1_200L)
+            if (isActive) {
+                haptics.commit()
+                finishLaunch()
+            }
         }
     }
 
@@ -278,7 +275,7 @@ fun RunSetupScreen(
                 planName = plan.name,
                 stage = stage,
                 reduceMotion = reduceMotion,
-                onSkip = { if (launching) finishLaunch() }
+                onCancel = { cancelLaunch() }
             )
         }
     }

@@ -26,27 +26,24 @@ struct RunSetupView: View {
         case three
         case two
         case one
-        case start
 
         var fraction: CGFloat {
             switch self {
             case .idle: return 0
-            case .ready: return 0.16
-            case .three: return 0.4
-            case .two: return 0.64
-            case .one: return 0.86
-            case .start: return 1
+            case .ready: return 0.10
+            case .three: return 0.40
+            case .two: return 0.70
+            case .one: return 1
             }
         }
 
         var label: String {
             switch self {
             case .idle: return ""
-            case .ready: return "准备就绪"
+            case .ready: return "准备好了吗？"
             case .three: return "3"
             case .two: return "2"
             case .one: return "1"
-            case .start: return "开始"
             }
         }
     }
@@ -105,7 +102,7 @@ struct RunSetupView: View {
                     planName: plan.name,
                     phase: launchPhase,
                     reduceMotion: reduceMotion,
-                    onSkip: finishLaunch
+                    onCancel: cancelLaunch
                 )
                 .transition(.opacity)
                 .zIndex(2)
@@ -208,34 +205,27 @@ struct RunSetupView: View {
 
     private func beginLaunch() {
         guard launchPhase == .idle, !startCommitted, !plan.steps.isEmpty else { return }
-        if reduceMotion {
-            finishLaunch()
-            return
-        }
         localError = nil
         launchPhase = .ready
         onLaunchingChanged(true)
         FlowHaptics.tick()
 
         launchTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 280_000_000)
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
             guard !Task.isCancelled else { return }
             launchPhase = .three
             FlowHaptics.tick()
-            try? await Task.sleep(nanoseconds: 330_000_000)
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             guard !Task.isCancelled else { return }
             launchPhase = .two
             FlowHaptics.tick()
-            try? await Task.sleep(nanoseconds: 330_000_000)
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             guard !Task.isCancelled else { return }
             launchPhase = .one
             FlowHaptics.tick()
-            try? await Task.sleep(nanoseconds: 330_000_000)
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             guard !Task.isCancelled else { return }
-            launchPhase = .start
             FlowHaptics.commit()
-            try? await Task.sleep(nanoseconds: 170_000_000)
-            guard !Task.isCancelled else { return }
             finishLaunch()
         }
     }
@@ -326,7 +316,7 @@ private struct FlowLaunchOverlayView: View {
     let planName: String
     let phase: RunSetupView.LaunchPhase
     let reduceMotion: Bool
-    let onSkip: () -> Void
+    let onCancel: () -> Void
 
     var body: some View {
         ZStack {
@@ -346,7 +336,7 @@ private struct FlowLaunchOverlayView: View {
                     Circle()
                         .trim(from: 0, to: phase.fraction)
                         .stroke(
-                            phase == .start ? FlowPalette.success : FlowPalette.primaryBright,
+                            FlowPalette.primaryBright,
                             style: StrokeStyle(lineWidth: 3.5, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
@@ -356,10 +346,15 @@ private struct FlowLaunchOverlayView: View {
                         )
 
                     Text(phase.label)
-                        .flowFont(phase == .start ? 40 : (phase == .ready ? 17 : 72), weight: .semibold)
-                        .foregroundColor(phase == .start ? FlowPalette.success : FlowPalette.runText)
+                        .flowFont(phase == .ready ? 21 : 72, weight: .semibold)
+                        .foregroundColor(FlowPalette.runText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
+                        .contentTransition(.opacity)
+                        .animation(
+                            reduceMotion ? nil : .easeInOut(duration: 0.28),
+                            value: phase
+                        )
                 }
                 .frame(width: 200, height: 200)
 
@@ -376,19 +371,17 @@ private struct FlowLaunchOverlayView: View {
 
             VStack {
                 Spacer()
-                Button(action: onSkip) {
-                    Text("跳过")
+                Button(action: onCancel) {
+                    Text("取消")
                         .flowFont(12, weight: .medium)
                         .foregroundColor(FlowPalette.runMutedText)
                         .padding(.horizontal, 18)
                         .frame(height: 36)
                 }
                 .buttonStyle(.plain)
-                .accessibilityIdentifier("launch-skip")
+                .accessibilityIdentifier("launch-cancel")
                 .padding(.bottom, 38)
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onSkip)
     }
 }

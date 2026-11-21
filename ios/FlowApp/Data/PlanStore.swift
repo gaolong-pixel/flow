@@ -42,6 +42,10 @@ final class PlanStore {
         }
     }
     func save(_ plan: Routine) throws {
+        // A plan with no steps is an unsaved draft, never a valid record.
+        guard !plan.steps.isEmpty else {
+            throw CocoaError(.validationMissingMandatoryProperty)
+        }
         lock.lock(); defer { lock.unlock() }
         var plans = try loadAllUnlocked()
         if let i = plans.firstIndex(where: { $0.id == plan.id }) { plans[i] = plan } else { plans.append(plan) }

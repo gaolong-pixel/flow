@@ -23,12 +23,14 @@ final class FlowPlanNamingUITests: XCTestCase {
 
         // Leading/trailing whitespace is trimmed on save.
         replaceText(in: nameField, with: "  Morning Flow  ")
-        app.buttons["editor-save-top"].tap()
-        XCTAssertEqual(nameField.value as? String, "Morning Flow")
-        attachScreenshot("plan-name-saved")
-
-        app.buttons["editor-back"].tap()
+        addSingleCountStep()
+        let saveTop = app.buttons["editor-save-top"]
+        XCTAssertTrue(saveTop.isEnabled)
+        saveTop.tap()
+        // Saving a new plan returns to the home list automatically.
+        XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.staticTexts["Morning Flow"].waitForExistence(timeout: 8))
+        attachScreenshot("plan-name-saved")
 
         // Reopen and rename the existing plan through the prepare menu.
         openEditorFromFirstPlan()
@@ -70,8 +72,9 @@ final class FlowPlanNamingUITests: XCTestCase {
         let nameField = app.textFields["plan-name-field"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 8))
         replaceText(in: nameField, with: "Delete Me")
+        addSingleCountStep()
         app.buttons["editor-save-top"].tap()
-        app.buttons["editor-back"].tap()
+        XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
 
         let planTitle = app.staticTexts["Delete Me"]
         XCTAssertTrue(planTitle.waitForExistence(timeout: 8))
@@ -104,6 +107,66 @@ final class FlowPlanNamingUITests: XCTestCase {
         attachScreenshot("delete-complete")
     }
 
+    private func addSingleCountStep(name: String = "Step") {
+        let add = app.buttons["add-node"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 8))
+        var attempts = 0
+        while !add.isHittable && attempts < 6 {
+            app.scrollViews.firstMatch.swipeUp()
+            attempts += 1
+        }
+        add.tap()
+        replaceText(in: app.textFields["步骤名称"], with: name)
+        replaceText(in: app.textFields["目标次数"], with: "1")
+        let save = app.navigationBars.buttons["保存"].firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 8))
+    }
+
+    func testEmptyDraftDoesNotCreatePlan() {
+        app.buttons["home-new"].tap()
+        XCTAssertTrue(app.textFields["plan-name-field"].waitForExistence(timeout: 8))
+        let save = app.buttons["editor-save-top"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertTrue(app.staticTexts["至少添加一个节点后才能保存流程。"].exists)
+        attachScreenshot("empty-draft-save-disabled")
+
+        app.buttons["editor-back"].tap()
+        XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
+        XCTAssertEqual(app.buttons.matching(identifier: "plan-start").count, 0)
+        XCTAssertTrue(app.staticTexts["还没有流程"].exists)
+    }
+
+    func testEditingExistingPlanCannotBeSavedEmpty() {
+        app.buttons["home-new"].tap()
+        let nameField = app.textFields["plan-name-field"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 8))
+        replaceText(in: nameField, with: "Keep Me")
+        addSingleCountStep(name: "Only Step")
+        app.buttons["editor-save-top"].tap()
+        XCTAssertTrue(app.staticTexts["Keep Me"].waitForExistence(timeout: 8))
+
+        openEditorFromFirstPlan()
+        app.buttons["文本编辑"].tap()
+        let text = app.textViews["editor-text"]
+        XCTAssertTrue(text.waitForExistence(timeout: 8))
+        clearText(in: text)
+        XCTAssertEqual(text.value as? String, "")
+        let save = app.buttons["editor-save-top"]
+        let disabled = NSPredicate(format: "isEnabled == false")
+        expectation(for: disabled, evaluatedWith: save)
+        waitForExpectations(timeout: 3)
+        attachScreenshot("existing-plan-empty-save-disabled")
+
+        app.buttons["editor-back"].tap()
+        XCTAssertTrue(app.staticTexts["Keep Me"].waitForExistence(timeout: 8))
+        app.buttons.matching(identifier: "plan-start").firstMatch.tap()
+        XCTAssertTrue(app.buttons["setup-start"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Keep Me"].exists)
+    }
+
     private func openEditorFromFirstPlan() {
         let card = app.buttons.matching(identifier: "plan-start").firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 8))
@@ -134,6 +197,13 @@ final class FlowPlanNamingUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func clearText(in field: XCUIElement) {
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.9)).tap()
+        field.typeText(
+            String(repeating: XCUIKeyboardKey.delete.rawValue, count: 200)
+        )
     }
 
     private func replaceText(in field: XCUIElement, with text: String) {

@@ -54,6 +54,33 @@ final class PlanStoreTests: XCTestCase {
         XCTAssertEqual(loaded[0].steps[1].durationMs, 60_000)
     }
 
+    func testEmptyPlanIsRejectedAndDoesNotCreateAFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flow-plans-\(UUID().uuidString).json")
+        let store = PlanStore(fileURL: url)
+        let empty = Routine(id: "empty", name: "Empty", steps: [], createdAt: 1, updatedAt: 1)
+        XCTAssertThrowsError(try store.save(empty))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertTrue(try store.loadAll().isEmpty)
+    }
+
+    func testEmptyPlanCannotOverwriteAnExistingPlan() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flow-plans-\(UUID().uuidString).json")
+        let store = PlanStore(fileURL: url)
+        let valid = Routine(id: "p", name: "Valid", steps: [
+            RoutineStep(id: "c", name: "Push", type: .count, target: 3, countMode: .complete)
+        ], createdAt: 1, updatedAt: 1)
+        try store.save(valid)
+        let empty = Routine(id: "p", name: "Valid", steps: [], createdAt: 1, updatedAt: 2)
+        XCTAssertThrowsError(try store.save(empty))
+        let loadedPlans = try store.loadAll()
+        XCTAssertEqual(loadedPlans.count, 1)
+        let loaded = loadedPlans[0]
+        XCTAssertEqual(loaded.steps.count, 1)
+        XCTAssertEqual(loaded.steps[0].name, "Push")
+    }
+
     func testCorruptFileIsRejectedAndUnchanged() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("flow-plans-\(UUID().uuidString).json")

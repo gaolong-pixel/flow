@@ -112,7 +112,8 @@ fun FlowApp(onBack: () -> Unit = {}) {
     val coordinator = remember(application) { application.runCoordinator }
     val store = remember { PlanStore(File(context.filesDir, "plans.json")) }
     var plans by remember { mutableStateOf<List<Routine>>(emptyList()) }
-    var editingId by remember { mutableStateOf<String?>(null) }
+    var editingPlan by remember { mutableStateOf<com.flow.app.domain.model.Routine?>(null) }
+    var editingIsNew by remember { mutableStateOf(false) }
     var setupPlan by remember { mutableStateOf<Routine?>(null) }
     var setupMessage by remember { mutableStateOf<String?>(null) }
     var exitSummary by remember { mutableStateOf<RunSummary?>(null) }
@@ -123,7 +124,7 @@ fun FlowApp(onBack: () -> Unit = {}) {
 
     fun reload() {
         try {
-            plans = store.loadAll()
+            plans = store.loadAll().filter { it.steps.isNotEmpty() }
             error = null
         } catch (e: Exception) {
             error = "读取计划失败"
@@ -168,7 +169,7 @@ fun FlowApp(onBack: () -> Unit = {}) {
             }
 
             RunRuntimeState.Idle -> {
-                val editing = editingId?.let { id -> plans.firstOrNull { it.id == id } }
+                val editing = editingPlan
                 val launchPlan = setupPlan?.let { pending ->
                     plans.firstOrNull { it.id == pending.id } ?: pending
                 }
@@ -193,8 +194,22 @@ fun FlowApp(onBack: () -> Unit = {}) {
                     editing != null -> {
                         EditorScreen(
                             initialRoutine = editing,
-                            onBack = { editingId = null; reload() },
-                            onPersist = { plan -> store.save(plan).also { if (it) reload() } }
+                            onBack = {
+                                editingPlan = null
+                                editingIsNew = false
+                                reload()
+                            },
+                            onPersist = { plan ->
+                                val saved = store.save(plan)
+                                if (saved) {
+                                    reload()
+                                    if (editingIsNew) {
+                                        editingPlan = null
+                                        editingIsNew = false
+                                    }
+                                }
+                                saved
+                            }
                         )
                     }
 
@@ -231,7 +246,8 @@ fun FlowApp(onBack: () -> Unit = {}) {
                             },
                             onLaunchingChanged = { launchDark = it },
                             onEdit = {
-                                editingId = launchPlan.id
+                                editingPlan = launchPlan
+                                editingIsNew = false
                                 setupPlan = null
                                 setupMessage = null
                                 launchDark = false
@@ -254,13 +270,10 @@ fun FlowApp(onBack: () -> Unit = {}) {
                             plans = plans,
                             error = error,
                             onCreate = {
-                                val plan = RoutineDraft.new(name = "未命名计划").toRoutine()
-                                if (store.save(plan)) {
-                                    reload()
-                                    editingId = plan.id
-                                } else {
-                                    error = "保存计划失败"
-                                }
+                                // New plans are an in-memory draft until the user
+                                // explicitly saves a plan with at least one node.
+                                editingPlan = RoutineDraft.new(name = "未命名计划").toRoutine()
+                                editingIsNew = true
                             },
                             onOpen = {
                                 setupPlan = it
@@ -686,6 +699,11 @@ private fun EditorScreen(
     var deleteTarget by remember { mutableStateOf<RoutineStep?>(null) }
     var nameInput by remember(initialRoutine.id) { mutableStateOf(initialRoutine.name) }
     var nameError by remember { mutableStateOf<String?>(null) }
+    val canSave = if (state.mode == EditorMode.CARDS) {
+        state.draft.steps.isNotEmpty()
+    } else {
+        !state.hasBlockingErrors && state.parseResult.steps.isNotEmpty()
+    }
 
     BackHandler { onBack() }
 
@@ -748,7 +766,12 @@ private fun EditorScreen(
         }
     }
 
-    val savePlan: () -> Unit = {
+    val savePlan: () -> Unit = save@{
+        if (!canSave) {
+            notice = UiNotice("至少添加一个节点后才能保存流程。", isError = true)
+            modeMessage = null
+            return@save
+        }
         when (val renamed = controller.rename(nameInput)) {
             is EditorResult.Failure -> {
                 state = renamed.state
@@ -971,7 +994,7 @@ private fun EditorScreen(
                 )
                 Spacer(Modifier.height(24.dp))
             }
-            EditorSaveBar(onSave = savePlan)
+            EditorSaveBar(onSave = savePlan, enabled = canSave)
         }
     }
 
@@ -1632,12 +1655,21 @@ private fun StepCard(
 }
 
 @Composable
-private fun EditorSaveBar(onSave: () -> Unit) {
+private fun EditorSaveBar(onSave: () -> Unit, enabled: Boolean) {
     Column(Modifier.fillMaxWidth().background(FlowSurface)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(FlowOutline))
+        if (!enabled) {
+            Text(
+                text = "至少添加一个节点后才能保存流程。",
+                modifier = Modifier.padding(start = 16.dp, top = 10.dp),
+                fontSize = 11.sp,
+                color = FlowInvalid
+            )
+        }
         Box(Modifier.padding(16.dp)) {
             Button(
                 onClick = onSave,
+                enabled = enabled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),

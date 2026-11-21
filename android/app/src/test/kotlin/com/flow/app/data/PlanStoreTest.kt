@@ -52,6 +52,30 @@ class PlanStoreTest {
         assertEquals(60_000L, loaded.single().steps[1].durationMs)
     }
 
+    @Test fun emptyPlanIsRejectedAndDoesNotCreateAFile() {
+        val file = File(temp.root, "plans.json")
+        val store = PlanStore(file)
+        val empty = Routine(id = "empty", name = "Empty", steps = emptyList(), createdAt = 1, updatedAt = 1)
+        assertFalse(store.save(empty))
+        assertFalse(file.exists())
+        assertTrue(store.loadAll().isEmpty())
+    }
+
+    @Test fun emptyPlanCannotOverwriteAnExistingPlan() {
+        val store = PlanStore(File(temp.root, "plans.json"))
+        val valid = Routine(
+            id = "p", name = "Valid",
+            steps = listOf(RoutineStep("c", "Push", StepType.COUNT, target = 3, countMode = CountMode.COMPLETE)),
+            createdAt = 1, updatedAt = 1
+        )
+        assertTrue(store.save(valid))
+        val empty = Routine(id = "p", name = "Valid", steps = emptyList(), createdAt = 1, updatedAt = 2)
+        assertFalse(store.save(empty))
+        val loaded = store.loadAll().single()
+        assertEquals(1, loaded.steps.size)
+        assertEquals("Push", loaded.steps.single().name)
+    }
+
     @Test fun corruptFileIsRejectedWithoutOverwrite() {
         val file = File(temp.root, "plans.json").also { it.writeText("{bad") }
         val store = PlanStore(file)

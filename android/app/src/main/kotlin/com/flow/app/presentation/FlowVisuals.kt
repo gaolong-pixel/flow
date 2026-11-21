@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -1170,11 +1172,10 @@ fun FlowConfetti(
 
 enum class FlowLaunchStage(val fraction: Float) {
     Idle(0f),
-    Ready(0.16f),
-    Three(0.4f),
-    Two(0.64f),
-    One(0.86f),
-    Go(1f)
+    Ready(0.10f),
+    Three(0.40f),
+    Two(0.70f),
+    One(1f)
 }
 
 @Composable
@@ -1182,7 +1183,7 @@ fun FlowLaunchOverlay(
     planName: String,
     stage: FlowLaunchStage,
     reduceMotion: Boolean,
-    onSkip: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val sweep by animateFloatAsState(
@@ -1190,13 +1191,11 @@ fun FlowLaunchOverlay(
         animationSpec = tween(if (reduceMotion) 0 else 300, easing = LinearEasing),
         label = "launchSweep"
     )
-    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(FlowRunBackground)
-            .clickable(interactionSource = interaction, indication = null, onClick = onSkip)
-            .semantics { contentDescription = "启动倒计时，点击跳过" },
+            .semantics { contentDescription = "启动倒计时" },
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -1226,7 +1225,7 @@ fun FlowLaunchOverlay(
                     drawCircle(FlowRunTrack, radius = radius, style = Stroke(stroke))
                     if (sweep > 0.001f) {
                         drawArc(
-                            color = if (stage == FlowLaunchStage.Go) FlowSuccess else FlowPrimaryBright,
+                            color = FlowPrimaryBright,
                             startAngle = -90f,
                             sweepAngle = 360f * sweep,
                             useCenter = false,
@@ -1236,26 +1235,30 @@ fun FlowLaunchOverlay(
                         )
                     }
                 }
-                Text(
-                    text = when (stage) {
-                        FlowLaunchStage.Ready -> "准备就绪"
-                        FlowLaunchStage.Three -> "3"
-                        FlowLaunchStage.Two -> "2"
-                        FlowLaunchStage.One -> "1"
-                        FlowLaunchStage.Go -> "开始"
-                        FlowLaunchStage.Idle -> ""
-                    },
-                    fontSize = when (stage) {
-                        FlowLaunchStage.Three,
-                        FlowLaunchStage.Two,
-                        FlowLaunchStage.One -> 72.sp
-                        FlowLaunchStage.Go -> 40.sp
-                        else -> 17.sp
-                    },
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (stage == FlowLaunchStage.Go) FlowSuccess else FlowRunText,
-                    textAlign = TextAlign.Center
-                )
+                Crossfade(
+                    targetState = stage,
+                    animationSpec = tween(if (reduceMotion) 0 else 280),
+                    label = "launchPhase"
+                ) { current ->
+                    Text(
+                        text = when (current) {
+                            FlowLaunchStage.Ready -> "准备好了吗？"
+                            FlowLaunchStage.Three -> "3"
+                            FlowLaunchStage.Two -> "2"
+                            FlowLaunchStage.One -> "1"
+                            FlowLaunchStage.Idle -> ""
+                        },
+                        fontSize = when (current) {
+                            FlowLaunchStage.Three,
+                            FlowLaunchStage.Two,
+                            FlowLaunchStage.One -> 72.sp
+                            else -> 21.sp
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                        color = FlowRunText,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
             Spacer(Modifier.height(18.dp))
             Text(
@@ -1269,10 +1272,13 @@ fun FlowLaunchOverlay(
             )
         }
         TextButton(
-            onClick = onSkip,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 38.dp)
+            onClick = onCancel,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 38.dp)
+                .testTag("launch-cancel")
         ) {
-            Text("跳过", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = FlowRunMutedText)
+            Text("取消", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = FlowRunMutedText)
         }
     }
 }

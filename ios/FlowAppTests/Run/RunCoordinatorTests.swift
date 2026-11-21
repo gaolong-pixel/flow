@@ -335,30 +335,6 @@ final class RunCoordinatorTests: XCTestCase {
         }
     }
 
-    func testSkipKeepsNodeVisibleInTheRollerSnapshot() {
-        let coordinator = makeCoordinator()
-        _ = startedSnapshot(coordinator.start(plan: makePlan([
-            makeCount(id: "c1"),
-            makeCount(id: "c2")
-        ])))
-        XCTAssertTrue(coordinator.startNode())
-        XCTAssertTrue(coordinator.skipCurrent())
-
-        let snapshot = coordinator.currentSnapshot
-        XCTAssertEqual(snapshot?.nodeIndex, 1)
-        XCTAssertEqual(snapshot?.nodeStatuses[0], .skipped)
-        XCTAssertEqual(snapshot?.visibleNodeIndices, [0, 1])
-        XCTAssertEqual(snapshot?.completedNodes, 0)
-        XCTAssertEqual(snapshot?.skippedNodes, 1)
-
-        // A skipped node can be selected again through the official entry.
-        XCTAssertTrue(coordinator.selectNode(0))
-        let resumed = coordinator.currentSnapshot
-        XCTAssertEqual(resumed?.nodeIndex, 0)
-        XCTAssertEqual(resumed?.nodeStatuses[0], .current)
-        XCTAssertEqual(resumed?.skippedNodes, 0)
-    }
-
     func testSelectNodeDefersPreviousAndCancelsTimerNotification() {
         let coordinator = makeCoordinator()
         clock.now = 0
@@ -396,57 +372,6 @@ final class RunCoordinatorTests: XCTestCase {
         XCTAssertEqual(restored?.nodeState, .paused)
         XCTAssertEqual(restored?.remainingMs, 20_000)
         XCTAssertTrue(coordinator.resume())
-    }
-
-    func testSkipCurrentRejectsLastActiveNodeAndCompletingItKeepsSkippedSummary() {
-        let coordinator = makeCoordinator()
-        _ = startedSnapshot(coordinator.start(plan: makePlan([
-            makeCount(id: "c1"),
-            makeCount(id: "c2")
-        ])))
-        XCTAssertTrue(coordinator.skipCurrent())
-        XCTAssertEqual(coordinator.currentSnapshot?.completedNodes, 0)
-        XCTAssertEqual(coordinator.currentSnapshot?.skippedNodes, 1)
-
-        // c2 is the only remaining active node; keeping it avoids ending the
-        // run and losing the skipped-node re-entry path.
-        XCTAssertFalse(coordinator.skipCurrent())
-        XCTAssertTrue(coordinator.startNode())
-        XCTAssertTrue(coordinator.completeNode())
-        guard case .active(let awaiting) = coordinator.runtime else {
-            XCTFail("Expected active runtime with skipped review")
-            return
-        }
-        XCTAssertTrue(awaiting.awaitingSkippedDecision)
-        XCTAssertFalse(awaiting.finalized)
-
-        XCTAssertTrue(coordinator.finishAfterSkippedReview())
-        guard case .finished(let summary) = coordinator.runtime else {
-            XCTFail("Expected finished runtime")
-            return
-        }
-        XCTAssertEqual(summary.completedNodes, 1)
-        XCTAssertEqual(summary.skippedNodes, 1)
-        XCTAssertTrue(summary.completedNormally)
-        XCTAssertTrue(notifications.events.contains("finished"))
-    }
-
-    func testSkippingTimerCancelsNotificationWithoutCompletingIt() {
-        let coordinator = makeCoordinator()
-        clock.now = 0
-        _ = startedSnapshot(coordinator.start(plan: makePlan([
-            makeTimer(ms: 10_000),
-            makeCount(id: "c2")
-        ])))
-        XCTAssertTrue(coordinator.startNode())
-        clock.advance(2_000)
-        XCTAssertTrue(coordinator.skipCurrent())
-
-        let snapshot = coordinator.currentSnapshot
-        XCTAssertEqual(snapshot?.nodeStatuses[0], .skipped)
-        XCTAssertEqual(snapshot?.completedNodes, 0)
-        XCTAssertFalse(notifications.events.contains("timerCompleted"))
-        XCTAssertTrue(notifications.events.contains("timerPaused"))
     }
 
     func testExpiryFeedbackTokenIsOneShotAndConsumable() {

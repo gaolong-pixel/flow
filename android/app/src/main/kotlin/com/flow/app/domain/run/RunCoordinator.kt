@@ -156,33 +156,6 @@ class RunCoordinator(
         true
     }
 
-    /** Explicitly skips the current node through the scheduler extension. */
-    fun skipCurrent(): Boolean = synchronized(lock) {
-        val active = controller ?: return false
-        val before = active.snapshot()
-        if (!active.skipCurrent()) return false
-        if (before.node?.type == StepType.TIMER &&
-            before.nodeState != NodeRunState.READY
-        ) {
-            notifications.onTimerPaused(before)
-        }
-        drainHaptics(active, allowDirectHaptics = true)
-        val snapshot = active.snapshot()
-        if (snapshot.finalized) {
-            val summary = active.finishedSummary() ?: return false
-            controller = null
-            alertedTimerRunId = null
-            _expiryFeedback.value = null
-            notifications.onRunFinished(summary)
-            background.stop(summary.runId)
-            _runtime.value = RunRuntimeState.Finished(summary)
-            return true
-        }
-        publish(snapshot)
-        notifications.onProgress(snapshot)
-        true
-    }
-
     fun pause(): Boolean = synchronized(lock) {
         val active = controller ?: return false
         val paused = active.pause()
@@ -237,34 +210,6 @@ class RunCoordinator(
         }
         publish(snapshot)
         notifications.onProgress(snapshot)
-        true
-    }
-
-    /**
-     * After the last executable node is completed, the controller waits if
-     * skipped nodes remain. This resumes the first skipped node.
-     */
-    fun resumeSkippedAfterReview(): Boolean = synchronized(lock) {
-        val active = controller ?: return false
-        if (!active.resumeSkippedAfterReview()) return false
-        drainHaptics(active, allowDirectHaptics = true)
-        val snapshot = active.snapshot()
-        publish(snapshot)
-        notifications.onProgress(snapshot)
-        true
-    }
-
-    /** Ends the run after the skipped-nodes prompt, preserving the summary. */
-    fun finishAfterSkippedReview(): Boolean = synchronized(lock) {
-        val active = controller ?: return false
-        if (!active.finishAfterSkippedReview()) return false
-        val summary = active.finishedSummary() ?: return false
-        controller = null
-        alertedTimerRunId = null
-        _expiryFeedback.value = null
-        notifications.onRunFinished(summary)
-        background.stop(summary.runId)
-        _runtime.value = RunRuntimeState.Finished(summary)
         true
     }
 

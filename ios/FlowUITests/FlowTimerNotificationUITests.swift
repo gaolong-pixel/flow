@@ -81,7 +81,6 @@ final class FlowTimerNotificationUITests: XCTestCase {
         let save = app.buttons["editor-save-top"]
         XCTAssertTrue(save.waitForExistence(timeout: 8))
         save.tap()
-        app.buttons["editor-back"].tap()
         XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
     }
 

@@ -23,7 +23,8 @@ enum class NodeRunState { READY, RUNNING, PAUSED, EXPIRED }
  * DEFERRED   - was started (or reached expiry) and the user deliberately
  *              switched away. It stays executable and keeps its progress.
  * COMPLETED  - counted as completed and removed from the execution roller.
- * SKIPPED    - explicitly not done in this run. Never counted as completed.
+ * SKIPPED    - legacy scheduling value from older builds. No new skips are
+ *              created; it is treated as a deferred, selectable node.
  */
 enum class NodeStatus { PENDING, CURRENT, DEFERRED, COMPLETED, SKIPPED }
 
@@ -42,9 +43,7 @@ data class PlanRunSnapshot(
     val runStartedAtEpochMs: Long,
     val finalized: Boolean,
     val nodeStatuses: List<NodeStatus> = emptyList(),
-    val skippedNodes: Int = 0,
-    val nodeRemainingMs: List<Long?> = emptyList(),
-    val awaitingSkippedDecision: Boolean = false
+    val nodeRemainingMs: List<Long?> = emptyList()
 ) {
     val node: RoutineStep? get() = plan.steps.getOrNull(nodeIndex)
     val totalNodes: Int get() = plan.steps.size
@@ -64,8 +63,7 @@ data class PlanRunSnapshot(
 
     /**
      * Node indexes that remain in the execution roller, in plan order.
-     * Completed nodes leave the roller; skipped nodes stay visible as a
-     * read-only record so the flow still reads as a whole.
+     * Completed nodes leave the roller; all other nodes stay visible.
      */
     val visibleNodeIndices: List<Int>
         get() = plan.steps.indices.filter { index ->
@@ -75,11 +73,6 @@ data class PlanRunSnapshot(
     val completedNodeIndices: List<Int>
         get() = plan.steps.indices.filter {
             nodeStatuses.getOrNull(it) == NodeStatus.COMPLETED
-        }
-
-    val skippedNodeIndices: List<Int>
-        get() = plan.steps.indices.filter {
-            nodeStatuses.getOrNull(it) == NodeStatus.SKIPPED
         }
 
     val deferredNodeIndices: List<Int>
@@ -132,11 +125,9 @@ class PlanRunController(
     private var index = 0
     private var loop = initialLoop
     private var completed = 0
-    private var skipped = 0
     private var deadline: Long? = null
     private var finalized = false
     private var exited = false
-    private var awaitingSkippedDecision = false
     private var timerRunId = 0L
 
     private val statuses = MutableList(plan.steps.size) { position ->
@@ -201,11 +192,9 @@ class PlanRunController(
             runStartedAtEpochMs = startedAtEpochMs,
             finalized = finalized,
             nodeStatuses = statuses.toList(),
-            skippedNodes = skipped,
             nodeRemainingMs = plan.steps.indices.map { position ->
                 perNodeRemainingLocked(position, now)
-            },
-            awaitingSkippedDecision = awaitingSkippedDecision
+            }
         )
     }
 
@@ -214,7 +203,7 @@ class PlanRunController(
      * monotonic deadline for its full duration.
      */
     fun startNode(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision || state != NodeRunState.READY) return false
+        if (finalized || exited || state != NodeRunState.READY) return false
         if (statuses[index] != NodeStatus.CURRENT) return false
         val current = node ?: return false
         if (current.type == StepType.TIMER) {
@@ -241,7 +230,7 @@ class PlanRunController(
      * it never completes a node.
      */
     fun refresh(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision || state != NodeRunState.RUNNING) return false
+        if (finalized || exited || state != NodeRunState.RUNNING) return false
         if (statuses[index] != NodeStatus.CURRENT) return false
         val current = node ?: return false
         if (current.type != StepType.TIMER) return false
@@ -263,7 +252,7 @@ class PlanRunController(
     }
 
     fun pause(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision || state != NodeRunState.RUNNING) return false
+        if (finalized || exited || state != NodeRunState.RUNNING) return false
         if (statuses[index] != NodeStatus.CURRENT) return false
         val current = node ?: return false
         if (current.type != StepType.TIMER) return false
@@ -282,7 +271,7 @@ class PlanRunController(
     }
 
     fun resume(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision || state != NodeRunState.PAUSED) return false
+        if (finalized || exited || state != NodeRunState.PAUSED) return false
         if (statuses[index] != NodeStatus.CURRENT) return false
         val left = remaining ?: return false
         if (left <= 0L) {
@@ -304,7 +293,7 @@ class PlanRunController(
      * Browsing the roller must never call this function by itself.
      */
     fun selectNode(targetIndex: Int): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision) return false
+        if (finalized || exited) return false
         if (targetIndex !in plan.steps.indices) return false
         if (targetIndex == index) return false
         val targetStatus = statuses[targetIndex]
@@ -314,12 +303,6 @@ class PlanRunController(
         ) {
             return false
         }
-        if (targetStatus == NodeStatus.SKIPPED) {
-            // Selecting a skipped node resumes it; it is no longer "currently
-            // skipped" from the flow's point of view.
-            skipped = (skipped - 1).coerceAtLeast(0)
-        }
-
         suspendCurrentForSwitchLocked()
         index = targetIndex
         statuses[targetIndex] = NodeStatus.CURRENT
@@ -340,32 +323,6 @@ class PlanRunController(
     }
 
     /**
-     * Explicitly skips the current node in this run. It never counts towards
-     * completedNodes; the node stays in the roller as SKIPPED and remains
-     * selectable/resumable with its execution state and progress retained.
-     * A running TIMER is frozen as PAUSED; a running COUNT keeps RUNNING; a
-     * never-started node stays READY. The next PENDING/DEFERRED node becomes
-     * current. If no executable node remains, the run finalizes normally.
-     */
-    fun skipCurrent(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision) return false
-        node ?: return false
-        // Skipping needs a different executable node to become current. If the
-        // current node is the last PENDING/DEFERRED target, keep it instead of
-        // ending the run and losing the skipped-node re-entry path.
-        if (!hasOtherSelectableNodeLocked()) return false
-        // Reuse the same suspend rules as an explicit target switch. This
-        // freezes a running TIMER and preserves its remaining time, while a
-        // COUNT keeps its RUNNING state.
-        suspendCurrentForSwitchLocked()
-        statuses[index] = NodeStatus.SKIPPED
-        skipped += 1
-        loop = false
-        advanceAfterRemovalLocked()
-        true
-    }
-
-    /**
      * Completes the current node.
      *
      * With loop enabled the current node is reset to READY (TIMER back to its
@@ -374,7 +331,7 @@ class PlanRunController(
      * selectable node becomes current without starting automatically.
      */
     fun completeNode(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision) return false
+        if (finalized || exited) return false
         val current = node ?: return false
         val allowed = when (current.type) {
             StepType.COUNT -> state == NodeRunState.RUNNING
@@ -409,13 +366,13 @@ class PlanRunController(
 
     /** Loop changes never advance, reset or count the node by themselves. */
     fun setLoop(enabled: Boolean): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision) return false
+        if (finalized || exited) return false
         loop = enabled
         true
     }
 
     fun toggleLoop(): Boolean = synchronized(lock) {
-        if (finalized || exited || awaitingSkippedDecision) return false
+        if (finalized || exited) return false
         loop = !loop
         true
     }
@@ -431,36 +388,6 @@ class PlanRunController(
         remaining = null
         activeTimerRunId = null
         summaryLocked(completedNormally = false)
-    }
-
-    /**
-     * The user chose to go back to a skipped node after the last executable
-     * node completed. Restores the first skipped node as current.
-     */
-    fun resumeSkippedAfterReview(): Boolean = synchronized(lock) {
-        if (finalized || exited || !awaitingSkippedDecision) return false
-        val target = statuses.indices.firstOrNull {
-            statuses[it] == NodeStatus.SKIPPED
-        } ?: return false
-        awaitingSkippedDecision = false
-        index = target
-        statuses[target] = NodeStatus.CURRENT
-        skipped = (skipped - 1).coerceAtLeast(0)
-        deadline = null
-        loop = false
-        if (states[target] == NodeRunState.RUNNING &&
-            plan.steps[target].type == StepType.TIMER
-        ) {
-            states[target] = NodeRunState.PAUSED
-        }
-        true
-    }
-
-    /** The user chose to end the run while skipped nodes remain. */
-    fun finishAfterSkippedReview(): Boolean = synchronized(lock) {
-        if (exited || !awaitingSkippedDecision) return false
-        finalizeLocked()
-        true
     }
 
     /** Summary after normal completion. Returns null if not finalized. */
@@ -521,16 +448,6 @@ class PlanRunController(
                     statuses[candidate] == NodeStatus.DEFERRED
             }
         if (next == null) {
-            val skippedIndex = statuses.indices.firstOrNull {
-                statuses[it] == NodeStatus.SKIPPED
-            }
-            if (skippedIndex != null) {
-                // Do not end the run yet: the user still has skipped nodes
-                // available to resume. The UI asks whether to go back.
-                awaitingSkippedDecision = true
-                index = skippedIndex
-                return
-            }
             finalizeLocked()
             return
         }
@@ -544,7 +461,6 @@ class PlanRunController(
     }
 
     private fun finalizeLocked() {
-        awaitingSkippedDecision = false
         finalized = true
         states[index] = NodeRunState.READY
         remaining = null
@@ -595,7 +511,7 @@ class PlanRunController(
         totalNodes = plan.steps.size,
         elapsedMs = (wallClock.nowEpochMs() - startedAtEpochMs).coerceAtLeast(0L),
         completedNormally = completedNormally,
-        skippedNodes = skipped
+        skippedNodes = 0
     )
 
     private fun safeAdd(base: Long, delta: Long): Long =

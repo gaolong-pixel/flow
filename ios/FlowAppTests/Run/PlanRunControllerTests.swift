@@ -380,7 +380,6 @@ final class PlanRunControllerTests: XCTestCase {
 
         XCTAssertEqual(snapshot.nodeStatuses, [.current, .pending, .pending])
         XCTAssertEqual(snapshot.visibleNodeIndices, [0, 1, 2])
-        XCTAssertEqual(snapshot.skippedNodes, 0)
         XCTAssertFalse(snapshot.isFinalNode)
     }
 
@@ -474,144 +473,6 @@ final class PlanRunControllerTests: XCTestCase {
         XCTAssertEqual(run.snapshot().completedNodes, 3)
     }
 
-    func testSkipNeverCountsAsCompletedAndCanBeReselected() {
-        let run = makeController(makePlan([makeCount(id: "c1"), makeTimer(ms: 5_000)]))
-        _ = run.startNode() // COUNT is RUNNING
-        XCTAssertTrue(run.skipCurrent())
-
-        let skipped = run.snapshot()
-        XCTAssertEqual(skipped.nodeIndex, 1)
-        XCTAssertEqual(skipped.completedNodes, 0)
-        XCTAssertEqual(skipped.skippedNodes, 1)
-        XCTAssertEqual(skipped.nodeStatuses[0], .skipped)
-        // The skipped node remains in the roller and is selectable.
-        XCTAssertEqual(skipped.visibleNodeIndices, [0, 1])
-
-        XCTAssertTrue(run.selectNode(0))
-        let resumed = run.snapshot()
-        XCTAssertEqual(resumed.nodeIndex, 0)
-        XCTAssertEqual(resumed.nodeStatuses[0], .current)
-        XCTAssertEqual(resumed.nodeState, .running)
-        XCTAssertEqual(resumed.skippedNodes, 0)
-
-        XCTAssertTrue(run.completeNode())
-        XCTAssertEqual(run.snapshot().completedNodes, 1)
-        XCTAssertEqual(run.snapshot().nodeStatuses[0], .completed)
-        XCTAssertEqual(run.snapshot().visibleNodeIndices, [1])
-    }
-
-    func testSkippingReadyNodeReselectsFromReady() {
-        let run = makeController(makePlan([makeCount(id: "c1"), makeCount(id: "c2")]))
-        XCTAssertTrue(run.skipCurrent()) // c1 was never started
-
-        XCTAssertTrue(run.selectNode(0))
-        XCTAssertEqual(run.snapshot().nodeState, .ready)
-        XCTAssertEqual(run.snapshot().skippedNodes, 0)
-        XCTAssertTrue(run.startNode())
-    }
-
-    func testReselectedSkippedNodeCanBeDeferredAgainAndReselected() {
-        let run = makeController(makePlan([makeCount(id: "c1"), makeCount(id: "c2")]))
-        _ = run.startNode()
-        XCTAssertTrue(run.skipCurrent()) // c1 SKIPPED (RUNNING retained), c2 current
-        XCTAssertTrue(run.selectNode(0)) // c1 CURRENT
-        XCTAssertTrue(run.selectNode(1)) // c1 DEFERRED, c2 current
-        XCTAssertEqual(run.snapshot().nodeStatuses[0], .deferred)
-        XCTAssertTrue(run.selectNode(0))
-        XCTAssertEqual(run.snapshot().nodeStatuses[0], .current)
-        XCTAssertEqual(run.snapshot().nodeState, .running)
-    }
-
-    func testSkippingRunningTimerPreservesProgressForReselection() {
-        let run = makeController(makePlan([makeTimer(ms: 10_000), makeCount()]))
-        clock.now = 0
-        _ = run.startNode()
-        clock.advance(4_000)
-        XCTAssertTrue(run.skipCurrent())
-
-        let skipped = run.snapshot()
-        XCTAssertEqual(skipped.nodeIndex, 1)
-        XCTAssertEqual(skipped.nodeStatuses[0], .skipped)
-        XCTAssertEqual(skipped.completedNodes, 0)
-        XCTAssertEqual(skipped.skippedNodes, 1)
-        XCTAssertEqual(skipped.remainingFor(0), 6_000)
-
-        XCTAssertTrue(run.selectNode(0))
-        let restored = run.snapshot()
-        XCTAssertEqual(restored.nodeIndex, 0)
-        XCTAssertEqual(restored.nodeState, .paused)
-        XCTAssertEqual(restored.remainingMs, 6_000)
-        XCTAssertEqual(restored.skippedNodes, 0)
-        XCTAssertTrue(run.resume())
-        clock.advance(1_000)
-        _ = run.refresh()
-        XCTAssertEqual(run.snapshot().remainingMs, 5_000)
-    }
-
-    func testLastActiveNodeCannotBeSkippedAndCompletingItKeepsSkippedSummary() {
-        let run = makeController(makePlan([makeCount(id: "c1"), makeCount(id: "c2")]))
-        _ = run.startNode()
-        XCTAssertTrue(run.skipCurrent())
-
-        // c2 is the only remaining PENDING/DEFERRED node. Skipping it would
-        // end the run and remove the skipped-node re-entry path, so it is
-        // rejected; the skipped c1 stays selectable in the roller.
-        XCTAssertFalse(run.skipCurrent())
-        let active = run.snapshot()
-        XCTAssertEqual(active.nodeIndex, 1)
-        XCTAssertEqual(active.nodeStatuses[0], .skipped)
-        XCTAssertEqual(active.nodeStatuses[1], .current)
-        XCTAssertEqual(active.skippedNodes, 1)
-        XCTAssertFalse(active.finalized)
-
-        _ = run.startNode()
-        _ = run.completeNode()
-        let awaiting = run.snapshot()
-        XCTAssertFalse(awaiting.finalized)
-        XCTAssertTrue(awaiting.awaitingSkippedDecision)
-        XCTAssertEqual(awaiting.completedNodes, 1)
-        XCTAssertEqual(awaiting.skippedNodes, 1)
-        XCTAssertEqual(awaiting.nodeIndex, 0)
-        XCTAssertEqual(awaiting.nodeStatuses[0], .skipped)
-        XCTAssertEqual(awaiting.nodeStatuses[1], .completed)
-
-        XCTAssertTrue(run.finishAfterSkippedReview())
-        let finished = run.snapshot()
-        XCTAssertTrue(finished.finalized)
-        XCTAssertEqual(finished.completedNodes, 1)
-        XCTAssertEqual(finished.skippedNodes, 1)
-        let summary = run.finishedSummary()
-        XCTAssertEqual(summary?.completedNodes, 1)
-        XCTAssertEqual(summary?.skippedNodes, 1)
-    }
-
-    func testSkippedReviewCanGoBackAndCompleteAllNodes() {
-        let run = makeController(makePlan([makeCount(id: "c1"), makeCount(id: "c2")]))
-        _ = run.startNode()
-        XCTAssertTrue(run.skipCurrent()) // c1 RUNNING -> SKIPPED
-        _ = run.startNode()
-        _ = run.completeNode() // c2 completed, c1 still skipped -> review
-
-        let awaiting = run.snapshot()
-        XCTAssertTrue(awaiting.awaitingSkippedDecision)
-        XCTAssertFalse(awaiting.finalized)
-
-        XCTAssertTrue(run.resumeSkippedAfterReview())
-        let resumed = run.snapshot()
-        XCTAssertFalse(resumed.awaitingSkippedDecision)
-        XCTAssertEqual(resumed.nodeIndex, 0)
-        XCTAssertEqual(resumed.nodeStatuses[0], .current)
-        XCTAssertEqual(resumed.nodeState, .running)
-        XCTAssertEqual(resumed.skippedNodes, 0)
-
-        XCTAssertTrue(run.completeNode())
-        let finished = run.snapshot()
-        XCTAssertTrue(finished.finalized)
-        XCTAssertEqual(finished.completedNodes, 2)
-        XCTAssertEqual(finished.skippedNodes, 0)
-        XCTAssertTrue(finished.skippedNodeIndices.isEmpty)
-    }
-
     func testLoopResetKeepsNodeCurrent() {
         let run = makeController(makePlan([makeCount(target: 3), makeTimer()]), initialLoop: true)
         _ = run.startNode()
@@ -635,14 +496,32 @@ final class PlanRunControllerTests: XCTestCase {
         XCTAssertFalse(run.selectNode(-1))
         XCTAssertFalse(run.selectNode(99))
 
-        XCTAssertTrue(run.skipCurrent()) // c1 skipped, c2 current
-        XCTAssertTrue(run.selectNode(0)) // skipped is selectable again
-        XCTAssertEqual(run.snapshot().nodeIndex, 0)
         _ = run.startNode()
         _ = run.completeNode() // c1 completed, c2 current
         XCTAssertEqual(run.snapshot().nodeIndex, 1)
         XCTAssertFalse(run.selectNode(0)) // completed
         XCTAssertFalse(run.selectNode(1)) // current
+    }
+
+    func testSwitchingAcrossMultipleNodesPreservesProgressAndNeverCompletes() {
+        let run = makeController(makePlan([
+            makeCount(id: "c1", target: 5),
+            makeTimer(ms: 10_000),
+            makeCount(id: "c2")
+        ]))
+        _ = run.startNode() // c1 RUNNING
+        XCTAssertTrue(run.selectNode(1))
+        XCTAssertTrue(run.selectNode(2))
+        XCTAssertTrue(run.selectNode(0))
+
+        let snapshot = run.snapshot()
+        XCTAssertEqual(snapshot.completedNodes, 0)
+        XCTAssertEqual(snapshot.nodeIndex, 0)
+        XCTAssertEqual(snapshot.nodeStatuses[0], .current)
+        XCTAssertEqual(snapshot.nodeStatuses[1], .pending)
+        XCTAssertEqual(snapshot.nodeStatuses[2], .pending)
+        XCTAssertEqual(snapshot.nodeState, .running)
+        XCTAssertEqual(snapshot.visibleNodeIndices.count, 3)
     }
 
     func testSwitchingResetsLoopSettingForTheTargetNode() {
@@ -653,12 +532,12 @@ final class PlanRunControllerTests: XCTestCase {
         XCTAssertFalse(run.snapshot().loopCurrentNode)
     }
 
-    func testExitSummaryCarriesSkippedCount() {
+    func testExitSummaryCarriesCompletedCountAndIsNotNormal() {
         let run = makeController(makePlan([makeCount(id: "c1"), makeCount(id: "c2")]))
-        XCTAssertTrue(run.skipCurrent())
+        _ = run.startNode()
+        _ = run.completeNode()
         let summary = run.exit()
-        XCTAssertEqual(summary?.skippedNodes, 1)
-        XCTAssertEqual(summary?.completedNodes, 0)
+        XCTAssertEqual(summary?.completedNodes, 1)
         XCTAssertEqual(summary?.totalNodes, 2)
         XCTAssertTrue(summary?.completedNormally == false)
     }
