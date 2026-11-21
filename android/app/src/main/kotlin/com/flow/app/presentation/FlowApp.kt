@@ -328,7 +328,7 @@ private fun PlanHomeScreen(
                     )
                     Spacer(Modifier.height(5.dp))
                     Text(
-                        text = "专注当下，完成每一个步骤",
+                        text = "把复杂的事，拆成清晰的步骤",
                         fontSize = 13.sp,
                         color = FlowSecondaryText
                     )

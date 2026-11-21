@@ -121,7 +121,7 @@ struct PlanHomeView: View {
                             .flowFont(28, weight: .semibold)
                             .foregroundColor(FlowPalette.text)
                             .padding(.top, 20)
-                        Text("专注当下，完成每一个步骤")
+                        Text("把复杂的事，拆成清晰的步骤")
                             .flowFont(13)
                             .foregroundColor(FlowPalette.secondaryText)
                             .padding(.top, 5)

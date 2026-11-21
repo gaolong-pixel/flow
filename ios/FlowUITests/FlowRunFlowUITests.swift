@@ -171,6 +171,161 @@ final class FlowRunFlowUITests: XCTestCase {
         alert.buttons["退出运行"].tap()
     }
 
+    func testRollerSchedulingAndScreenshots() {
+        createPlan(expectedTotalPlans: 1, steps: [
+            CardStep(type: .count, name: "Alpha", value: 5),
+            CardStep(type: .timer, name: "Beta", value: 12),
+            CardStep(type: .count, name: "Gamma", value: 4),
+            CardStep(type: .timer, name: "Delta", value: 3)
+        ])
+        startPlan(at: 0)
+
+        // Initial state: all nodes are visible and the first one is expanded.
+        XCTAssertTrue(app.staticTexts["Alpha"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["1 / 4"].exists)
+        XCTAssertTrue(app.staticTexts["Gamma"].exists)
+        attachScreenshot("roller-initial-multi-level")
+
+        // COUNT current: a calm, target-only waiting state. No per-repetition
+        // counter is exposed; the user completes when they are ready.
+        XCTAssertEqual(app.buttons["run-primary"].label, "开始")
+        app.buttons["run-primary"].tap()
+        XCTAssertTrue(app.staticTexts["目标 5 次"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["进行中"].exists)
+        XCTAssertFalse(app.buttons["run-count-increment"].exists)
+        attachScreenshot("roller-count-current")
+
+        // Tapping a compact roller card switches the execution target. The
+        // COUNT must be deferred without being completed.
+        let betaCard = app.buttons["run-node-1"]
+        for _ in 0..<3 where !betaCard.isHittable {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(betaCard.waitForExistence(timeout: 5))
+        betaCard.tap()
+        XCTAssertTrue(app.staticTexts["2 / 4"].waitForExistence(timeout: 5))
+        let alphaCard = app.buttons["run-node-0"]
+        XCTAssertTrue(alphaCard.waitForExistence(timeout: 5))
+        XCTAssertTrue(alphaCard.label.contains("暂缓"))
+        XCTAssertTrue(app.staticTexts["目标 5 次"].exists)
+        attachScreenshot("roller-after-switch")
+
+        // TIMER current with real countdown and both action buttons.
+        XCTAssertEqual(app.buttons["run-primary"].label, "开始计时")
+        app.buttons["run-primary"].tap()
+        XCTAssertTrue(app.staticTexts["run-countdown"].waitForExistence(timeout: 5))
+        attachScreenshot("roller-timer-current")
+
+        // Completing removes the node from the roller and folds it into the
+        // collapsed archive.
+        XCTAssertTrue(app.buttons["run-secondary"].waitForExistence(timeout: 5))
+        app.buttons["run-secondary"].tap()
+        XCTAssertTrue(app.staticTexts["3 / 4"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["已完成 1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Beta"].exists)
+        attachScreenshot("roller-completed-collapsed")
+
+        app.buttons["run-completed-toggle"].tap()
+        XCTAssertTrue(app.staticTexts["Beta"].waitForExistence(timeout: 5))
+        attachScreenshot("roller-completed-expanded")
+
+        // A deferred COUNT remains selectable.
+        for _ in 0..<4 where !alphaCard.isHittable {
+            app.scrollViews.firstMatch.swipeDown()
+        }
+        if alphaCard.waitForExistence(timeout: 3), alphaCard.isHittable {
+            alphaCard.tap()
+            XCTAssertTrue(app.staticTexts["1 / 4"].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["目标 5 次"].exists)
+            XCTAssertTrue(app.staticTexts["进行中"].exists)
+            XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
+        }
+
+        app.buttons["run-exit"].tap()
+        let alert = app.alerts["退出本次运行？"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["退出运行"].tap()
+    }
+
+    func testTimerExpiryFeedbackInForeground() {
+        createPlan(expectedTotalPlans: 1, steps: [
+            CardStep(type: .timer, name: "Pulse", value: 5)
+        ])
+        startPlan(at: 0)
+        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 8))
+        XCTAssertEqual(app.buttons["run-primary"].label, "开始计时")
+        app.buttons["run-primary"].tap()
+
+        XCTAssertTrue(app.staticTexts["时间到"].waitForExistence(timeout: 12))
+        XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
+        attachScreenshot("timer-expired-foreground")
+        Thread.sleep(forTimeInterval: 0.4)
+    }
+
+    func testSkippedNodeCanBeReselectedAndCompleted() {
+        createPlan(expectedTotalPlans: 1, steps: [
+            CardStep(type: .count, name: "SkipA", value: 5),
+            CardStep(type: .count, name: "SkipB", value: 3),
+            CardStep(type: .count, name: "SkipC", value: 4)
+        ])
+        startPlan(at: 0)
+        XCTAssertTrue(app.buttons["run-primary"].waitForExistence(timeout: 8))
+
+        // Skip a READY node. It stays in the roller as a selectable card.
+        app.buttons["run-skip"].tap()
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["已完成 0"].exists)
+        let skippedA = app.buttons["run-node-0"]
+        XCTAssertTrue(skippedA.waitForExistence(timeout: 5))
+        XCTAssertTrue(skippedA.label.contains("已跳过"))
+        attachScreenshot("roller-skipped-visible")
+
+        // Reselect it: a never-started node returns to READY.
+        skippedA.tap()
+        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["run-primary"].label, "开始")
+
+        // Start it, skip it while RUNNING, then reselect: the RUNNING state is
+        // retained, so the primary action is still "完成当前节点".
+        app.buttons["run-primary"].tap()
+        XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
+        app.buttons["run-skip"].tap()
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5))
+        let skippedRunningA = app.buttons["run-node-0"]
+        XCTAssertTrue(skippedRunningA.waitForExistence(timeout: 5))
+        skippedRunningA.tap()
+        XCTAssertTrue(app.staticTexts["1 / 3"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["run-primary"].label, "完成当前节点")
+        attachScreenshot("roller-skipped-reselected")
+
+        // Only an explicit completion moves it to the archive.
+        app.buttons["run-primary"].tap()
+        XCTAssertTrue(app.staticTexts["2 / 3"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["已完成 1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["SkipA"].exists)
+
+        // Skip B while C is still active. B remains visible in the roller.
+        app.buttons["run-skip"].tap()
+        XCTAssertTrue(app.staticTexts["3 / 3"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["run-node-1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["SkipB"].exists)
+
+        // C is the last active node: skipping it is disabled so the flow can
+        // always return to a skipped node.
+        XCTAssertFalse(app.buttons["run-skip"].isEnabled)
+
+        // Complete C; the run finalizes with 2 completed and 1 skipped.
+        XCTAssertEqual(app.buttons["run-primary"].label, "开始")
+        app.buttons["run-primary"].tap()
+        app.buttons["run-primary"].tap()
+        XCTAssertTrue(app.staticTexts["本次流程结束"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["已完成 2 个节点，跳过 1 个"].exists)
+        XCTAssertTrue(app.staticTexts["跳过 1"].exists)
+        attachScreenshot("result-skipped")
+        app.buttons["result-back"].tap()
+        XCTAssertTrue(app.buttons["home-new"].waitForExistence(timeout: 8))
+    }
+
     // MARK: - Helpers
 
     private func attachScreenshot(_ name: String) {

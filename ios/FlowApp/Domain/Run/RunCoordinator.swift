@@ -69,6 +69,11 @@ final class RunCoordinator: ObservableObject {
     @Published private(set) var runtime: RunRuntimeState = .idle
     @Published private(set) var lastExitSummary: RunSummary?
 
+    /// One-shot UI expiry feedback token. It is process-scoped (not stored in
+    /// the view) so a recomposition or a return from background cannot replay
+    /// the shake for an already-consumed TIMER expiry.
+    @Published private(set) var expiryFeedbackToken: Int64?
+
     private let monotonic: RunMonotonicClock
     private let wallClock: RunWallClock
     private let notifications: RunNotificationSink
@@ -115,6 +120,7 @@ final class RunCoordinator: ObservableObject {
         )
         controller = fresh
         alertedTimerRunID = nil
+        expiryFeedbackToken = nil
         lastExitSummary = nil
         let snapshot = fresh.snapshot()
         runtime = .active(snapshot)
@@ -133,6 +139,50 @@ final class RunCoordinator: ObservableObject {
             notifications.onTimerStarted(snapshot)
         }
         drainHaptics(active)
+        return true
+    }
+
+    /// Switches the execution target. The controller freezes a running TIMER
+    /// and marks the previous node DEFERRED. Timer notifications are cancelled
+    /// before the new node is published so a deferred timer can never fire an
+    /// out-of-date alert.
+    @discardableResult
+    func selectNode(_ targetIndex: Int) -> Bool {
+        guard let active = controller else { return false }
+        let before = active.snapshot()
+        guard active.selectNode(targetIndex) else { return false }
+        if before.node?.type == .timer, before.nodeState != .ready {
+            notifications.onTimerPaused(before)
+        }
+        drainHaptics(active)
+        let snapshot = active.snapshot()
+        publish(snapshot)
+        notifications.onProgress(snapshot)
+        return true
+    }
+
+    /// Explicitly skips the current node through the scheduler extension.
+    @discardableResult
+    func skipCurrent() -> Bool {
+        guard let active = controller else { return false }
+        let before = active.snapshot()
+        guard active.skipCurrent() else { return false }
+        if before.node?.type == .timer, before.nodeState != .ready {
+            notifications.onTimerPaused(before)
+        }
+        drainHaptics(active)
+        let snapshot = active.snapshot()
+        if snapshot.finalized {
+            guard let summary = active.finishedSummary() else { return false }
+            controller = nil
+            alertedTimerRunID = nil
+            expiryFeedbackToken = nil
+            notifications.onRunFinished(summary)
+            runtime = .finished(summary)
+            return true
+        }
+        publish(snapshot)
+        notifications.onProgress(snapshot)
         return true
     }
 
@@ -184,6 +234,7 @@ final class RunCoordinator: ObservableObject {
             guard let summary = active.finishedSummary() else { return false }
             controller = nil
             alertedTimerRunID = nil
+            expiryFeedbackToken = nil
             notifications.onRunFinished(summary)
             runtime = .finished(summary)
             return true
@@ -236,6 +287,7 @@ final class RunCoordinator: ObservableObject {
         guard let active = controller, let summary = active.exit() else { return nil }
         controller = nil
         alertedTimerRunID = nil
+        expiryFeedbackToken = nil
         notifications.onRunExited(summary)
         lastExitSummary = summary
         runtime = .idle
@@ -262,7 +314,16 @@ final class RunCoordinator: ObservableObject {
         }
         guard alertedTimerRunID != timerId else { return }
         alertedTimerRunID = timerId
+        expiryFeedbackToken = timerId
         notifications.onTimerExpired(snapshot)
+    }
+
+    /// Marks the expiry feedback token consumed after the UI has played it
+    /// once. Calling this for an older token never clears a newer expiry.
+    func consumeExpiryFeedback(_ token: Int64) {
+        if expiryFeedbackToken == token {
+            expiryFeedbackToken = nil
+        }
     }
 
     private func drainHaptics(_ active: PlanRunController) {

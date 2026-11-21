@@ -44,8 +44,26 @@ private struct ResultScaffold: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confettiProgress: Double = 0
 
+    private var hadSkips: Bool {
+        completedNormally && summary.skippedNodes > 0
+    }
+
+    private var celebrate: Bool {
+        completedNormally && summary.skippedNodes == 0
+    }
+
     private var title: String {
-        completedNormally ? "执行完成！" : "已退出流程"
+        if !completedNormally { return "已退出流程" }
+        if hadSkips { return "本次流程结束" }
+        return "执行完成！"
+    }
+
+    private var subtitle: String {
+        if !completedNormally { return "当前节点未计入完成数量" }
+        if hadSkips {
+            return "已完成 \(summary.completedNodes) 个节点，跳过 \(summary.skippedNodes) 个"
+        }
+        return "太棒了！继续保持！"
     }
 
     private var titleIdentifier: String {
@@ -67,7 +85,7 @@ private struct ResultScaffold: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ZStack {
-                            if completedNormally {
+                            if celebrate {
                                 FlowConfettiView(progress: confettiProgress)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
@@ -87,7 +105,7 @@ private struct ResultScaffold: View {
                             .padding(.top, 8)
                             .accessibilityIdentifier(titleIdentifier)
 
-                        Text(completedNormally ? "太棒了！继续保持！" : "当前节点未计入完成数量")
+                        Text(subtitle)
                             .flowFont(13)
                             .foregroundColor(FlowPalette.secondaryText)
                             .multilineTextAlignment(.center)
@@ -105,6 +123,14 @@ private struct ResultScaffold: View {
                                 .flowFont(12)
                                 .foregroundColor(FlowPalette.secondaryText)
                                 .accessibilityIdentifier("result-duration")
+                            if summary.skippedNodes > 0 {
+                                Circle()
+                                    .fill(FlowPalette.outlineStrong)
+                                    .frame(width: 3, height: 3)
+                                Text("跳过 \(summary.skippedNodes)")
+                                    .flowFont(12)
+                                    .foregroundColor(FlowPalette.warmInk)
+                            }
                         }
                         .padding(.top, 14)
 
@@ -121,7 +147,7 @@ private struct ResultScaffold: View {
             }
         }
         .task {
-            if completedNormally && !reduceMotion {
+            if celebrate && !reduceMotion {
                 withAnimation(.easeOut(duration: 1.1)) {
                     confettiProgress = 1
                 }

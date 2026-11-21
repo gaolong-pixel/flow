@@ -2,7 +2,17 @@
 
 本文记录 Android 与 iOS 的计划运行实现、双端一致的产品语义、通知/后台策略、测试与已知限制。
 
-## 0. 2026-11-19 UI 修正
+## 0. 2026-11-21 执行滚筒 v2
+
+- 运行页从单节点全屏改为纵向 3D 流程滚筒：当前节点展开，其他待执行/暂缓节点紧凑排列，按与视口的距离做缩放、透明度、旋转和透视。
+- 调度扩展：每个节点有 `PENDING / CURRENT / DEFERRED / COMPLETED / SKIPPED` 调度状态；`selectNode` 在不丢失进度的前提下切换执行目标。
+- COUNT 保持“目标次数 + 开始/完成”语义，不做逐次计数；开始后显示为目标次数服务的平静呼吸等待，完成由用户主动点击。
+- 切换离开 RUNNING TIMER 时冻结剩余时间并标记暂缓；切回后恢复 PAUSED，由用户继续。
+- 完成节点移入默认折叠的“已完成”区域；跳过是独立操作，不计完成，但跳过节点继续留在滚筒中并标记“已跳过”，可以重新选择并恢复此前进度。
+- 运行页增加完成归档、跳过入口、流程进度、当前节点位置；结果页在存在跳过时显示“本次流程结束”和跳过数量，不显示完成彩纸。
+- 未新增进程级 Session 持久化；运行状态仍只在当前进程内。
+
+## 0.1 2026-11-19 UI 修正
 
 - 编辑页顶部新增流程名称输入框；名称去除首尾空白、非空、最多 60 个 Unicode 字符，随保存与节点一起持久化。
 - 单节点循环从启动设置移到运行页：启动设置不再显示循环选择，每次启动默认关闭；运行页保留完整循环功能和既有语义。
@@ -11,37 +21,58 @@
 
 ```text
 计划列表
-  └─ 点击“开始” → 启动设置（顺序播放；不提供循环选择）
-       └─ 开始运行 → 运行页
-            ├─ COUNT：开始 → 完成本节点
-            ├─ TIMER：开始 → 倒计时 ⇄ 暂停/继续 → 提前完成 / 到期 → 完成本节点
+  └─ 点击“开始” → 启动设置（不提供循环选择）
+       └─ 开始运行 → 纵向 3D 滚筒运行页
+            ├─ 当前 COUNT：开始 → 平静呼吸等待 → 完成本节点
+            ├─ 当前 TIMER：开始 → 倒计时 ⇄ 暂停/继续 → 提前完成 / 到期 → 完成本节点
+            ├─ 点击其他待执行/暂缓节点 → 切换执行目标
+            │    └─ 原 TIMER RUNNING → 冻结为 PAUSED + DEFERRED
+            │    └─ 原 COUNT 保持 RUNNING；未开始的节点保持 PENDING
+            ├─ 跳过 → SKIPPED（不计完成，保留在滚筒中，可重新选择）
             ├─ 当前节点循环：开启后完成 → 重置当前节点（不计完成数）
-            ├─ 退出 → 退出确认 → 已退出流程页（X/Y）→ 首页
-            └─ 最后节点完成 → 流程已完成页 → 首页
+            ├─ 已完成区域：折叠 / 展开；完成节点从滚筒移除
+            ├─ 退出 → 退出确认 → 已退出流程页（X/Y + 跳过数）→ 首页
+            └─ 所有可执行节点完成 / 用户结束 → 结果页 → 首页
 ```
 
 运行期间不提供编辑入口；计划列表在运行页背后不可达，退出/结束前不能启动第二个计划。
 
 ## 2. 运行状态机
 
-双端使用同一状态语义，独立实现：
+双端使用同一状态语义，独立实现。
 
-- 节点状态：`READY`、`RUNNING`、`PAUSED`、`EXPIRED`。
+### 2.1 执行状态（节点级）
+
+- 节点执行状态：`READY`、`RUNNING`、`PAUSED`、`EXPIRED`。
 - `READY`：当前节点待开始；TIMER 显示完整时长。
 - `RUNNING`：COUNT 已开始 / TIMER 已建立单调时钟 deadline。
 - `PAUSED`：TIMER 剩余时间冻结，继续时从剩余时间建立新 deadline。
 - `EXPIRED`：TIMER 归零；**不会自动完成节点**，必须用户点击“完成本节点”。
-- 全部节点完成后运行结束；循环迭代不增加完成节点数。
+- 所有可执行节点完成，或用户主动结束后运行结束；跳过节点在运行结束前始终保留在滚筒中并可重新选择。循环迭代不增加完成节点数，跳过也不计入完成数。
 - 每次启动默认循环关闭；启动设置不提供循环入口，运行页可随时开关。推进到下一节点时循环自动关闭（“循环只作用于当前节点”）。
 - 关闭循环本身不推进节点，不重置剩余时间；只有点击完成才推进。
 - 循环完成时：当前节点回到 `READY`，TIMER 重置为完整时长，COUNT 重新展示目标数量，不自动开始下一轮。
 - 退出返回 `completedNodes / totalNodes` 用于进度反馈；运行实例随之销毁。
 
+### 2.2 调度状态（流程级）
+
+- 调度状态：`PENDING`、`CURRENT`、`DEFERRED`、`COMPLETED`、`SKIPPED`。
+- 同一时刻只有一个 `CURRENT`；初始为第一个节点，恢复时按真实快照恢复，不重置到第一个。
+- 点击其他 `PENDING`/`DEFERRED` 节点调用 `selectNode`：
+  - 原节点未开始 → 回到 `PENDING`；
+  - 原 TIMER 正在运行 → 计算剩余时间、清除 deadline、置 `PAUSED`、调度状态 `DEFERRED`；
+  - 原 COUNT 已开始 → 保留 `RUNNING`，调度状态 `DEFERRED`；
+  - 目标节点可以是 `PENDING / DEFERRED / SKIPPED`；恢复其保留的执行状态（TIMER `PAUSED` / `EXPIRED`，COUNT `RUNNING` / `READY`）。
+- `completeNode`：标记 `COMPLETED`、完成数 +1、从滚筒移除；随后按计划顺序选择下一个 `PENDING`/`DEFERRED`（循环一圈），只设为当前，不自动开始。
+- `skipCurrent`：先按切换规则暂停/保留当前执行状态，再标记 `SKIPPED`、跳过数 +1、不计完成；跳过节点继续留在滚筒中显示为“已跳过 · 可继续”，之后可重新选择并恢复进度。若当前是最后一个 `PENDING/DEFERRED` 节点，跳过被拒绝（UI 禁用跳过），避免流程结束导致跳过节点失去入口。
+- 循环只作用于当前节点；循环重置把 TIMER 恢复完整时长。切换节点会关闭循环（与原有“循环只作用于当前节点”一致）。
+- 运行快照新增 `nodeStatuses`、`nodeRemainingMs`、`skippedNodes`；`RunSummary` 新增 `skippedNodes`（默认 0）。
+
 单调时钟：
 - Android `SystemClock.elapsedRealtime()`；iOS `mach_continuous_time()`。
 - 剩余时间始终由 deadline 派生；UI ticker 只触发重新计算/重绘，不是时间来源。
 - App 回到前台、后台服务 tick、用户操作都会重新计算；暂停冻结、继续恢复。
-- wall clock 仍保留在 RunSummary 中用于内部结果数据；本轮 UI 不展示用时，避免把结果页做成统计面板。
+- wall clock 仍保留在 RunSummary 中用于真实用时；结果页展示真实完成节点数、跳过数和用时，不伪造每节点统计。
 
 ## 3. 双端结构
 
@@ -50,7 +81,9 @@
 - [`PlanRunController.kt`](../android/app/src/main/kotlin/com/flow/app/domain/run/PlanRunController.kt)：纯 JVM 状态机。
 - [`RunCoordinator.kt`](../android/app/src/main/kotlin/com/flow/app/domain/run/RunCoordinator.kt)：App 级单例持有、单实例保护、通知/触觉/后台服务生命周期。
 - [`FlowApplication.kt`](../android/app/src/main/kotlin/com/flow/app/FlowApplication.kt)：进程级 `RunCoordinator`。
-- [`RunScreen.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunScreen.kt)、[`RunSetupScreen.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunSetupScreen.kt)、[`RunResultScreen.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunResultScreen.kt)。
+- [`RunScreen.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunScreen.kt)：执行页编排、生命周期、到期反馈触发、结果跳转。
+- [`RunRoller.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunRoller.kt)：3D 滚筒、当前/紧凑节点卡、COUNT/TIMER 动效、已完成归档、底部操作坞。
+- [`RunSetupScreen.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunSetupScreen.kt)、[`RunResultScreen.kt`](../android/app/src/main/kotlin/com/flow/app/presentation/RunResultScreen.kt)。
 - [`AndroidRunPlatform.kt`](../android/app/src/main/kotlin/com/flow/app/platform/run/AndroidRunPlatform.kt)：通知、触觉、前台服务启动器。
 - [`RunForegroundService.kt`](../android/app/src/main/kotlin/com/flow/app/platform/run/RunForegroundService.kt)：`START_NOT_STICKY`，500ms tick 调用同一 coordinator。
 
@@ -83,6 +116,7 @@
 ## 6. 触觉
 
 - 双端控制器在 TIMER 剩余 ≤3 秒时发出一次 `TIMER_WARNING`，到期时发出一次 `TIMER_EXPIRED`；每个计时 run 最多一次。
+- 执行页另有一个进程级、一次性消费的到期 UI token：`RunCoordinator.expiryFeedback` / `expiryFeedbackToken`。真实到期时设置，UI 播放完 450ms 左右横向震动后消费；重新渲染、旋转或从后台恢复都不会重复触发。
 - Android：前台使用 `Vibrator` / `VibrationEffect`；后台由前台服务检测到期并发送高重要度通知，由通知渠道振动，不同时触发直接振动。
 - iOS：`UIImpactFeedbackGenerator` / `UINotificationFeedbackGenerator`；后台由本地通知声音/振动提示。
 - 触觉只通过事件计数测试和平台 API 调用验证；Android 真机人工测试未单独评估触觉手感，模拟器无真实马达。
@@ -99,19 +133,20 @@
 ## 8. 旧执行模型清理
 
 - 删除阶段七 `ExecutionSession`、`ExecutionScheduling`、`ExecutionController`、`ExecutionTimerEngine` 及对应测试。
-- 运行功能不再使用 `records`、`completedCount`、`skippedCount`、Scheduler 自动推进、流程/步骤 repeat 语义。
+- 运行功能不使用旧 Scheduler/records；本轮的 `NodeStatus` 与 `skipCurrent` 只是运行控制器内部的最小调度扩展，不恢复阶段七的自动推进/执行记录模型。
 - 计划编辑/文本解析契约保留：`x N`、`[计数=完成]`、`[分类=休息]` 仍被解析器接受以兼容历史输入；计划 JSON 和运行逻辑只使用 COUNT 目标、TIMER 时长。
 - 保留独立的单调时钟与计时思路，但新实现是运行控制器内部的最小 deadline 逻辑，不复用旧 TimerEngine。
 
 ## 9. 测试与验证
 
-- Android JVM：`PlanRunControllerTest`、`RunCoordinatorTest`、`RunFormattingTest` 覆盖状态转换、COUNT/TIMER、暂停/继续/到期、循环、退出统计、单实例、通知回调、后台生命周期、不持久化、Parser 共享用例。
-- iOS XCTest：对应 `PlanRunControllerTests`、`RunCoordinatorTests`、`RunNotificationSinkTests`、`RunFormattingTests`。
-- iOS XCUITest：
-  - `FlowRunFlowUITests`：从空数据创建两个计划，完成启动设置（确认无循环入口）→ COUNT → TIMER 暂停/继续/提前完成 → 运行页循环开关（默认关闭）→ 推进 → 退出确认 → 已退出流程页 → 第二计划 TIMER 到期 → 流程已完成页 → 返回首页。
+- Android JVM（173 tests / 0 failures）：`PlanRunControllerTest`、`RunCoordinatorTest`、`RunFormattingTest` 覆盖状态转换、COUNT/TIMER、暂停/继续/到期、循环、退出统计、单实例、通知回调、后台生命周期、不持久化、Parser 共享用例，以及本轮新增的调度状态、切换/暂缓、跳过保留、归档选择回绕、到期 token 一次性。
+- iOS XCTest（167 tests / 0 failures）：对应 `PlanRunControllerTests`、`RunCoordinatorTests`、`RunNotificationSinkTests`、`RunFormattingTests`，新增用例与 Android 同构。
+- iOS XCUITest（最终 8 tests / 0 failures）：
+  - `FlowRunFlowUITests`：既有两计划全链路、启动倒计时、新增 `testRollerSchedulingAndScreenshots`（初始滚筒、COUNT 目标等待、切换暂缓、TIMER 当前、完成归档折叠/展开）、`testSkippedNodeCanBeReselectedAndCompleted`（跳过、重新选择并恢复 RUNNING、最后活动跳过禁用、结果页）、`testTimerExpiryFeedbackInForeground`（前台到期反馈）。
+  - `FlowPlanNamingUITests`：流程命名/删除确认。
   - `FlowTimerNotificationUITests`：后台 2 秒 TIMER，验证系统本地通知实际到达，回到前台显示到期且不自动完成。
-- Android 模拟器（API 37）：人工 ADB 操作完成同一核心链路，并验证前后台通知、暂停冻结、到期不自动完成、退出/完成后通知与前台服务清理、force-stop 后无旧运行实例。
-- 验证证据：本地 `artifacts/`（不随源码提交）。
+- Android 模拟器（API 37）：ADB 人工走查初始滚筒、COUNT 目标等待、切换 TIMER、暂停/恢复、完成归档折叠/展开、跳过保留、到期、前后台剩余时间与暂停冻结。
+- 验证证据：`artifacts/ui-roller-v2-20261121/`（不随源码提交）。
 
 ## 10. 已知限制
 
@@ -119,5 +154,7 @@
 - Android 深度休眠下的到期提醒依赖前台服务调度，可能延迟；不使用精确闹钟，不申请精确闹钟权限。
 - iOS 不做永久后台；进程被杀后的本地通知无法立即撤销，只能在下一次启动清理。
 - 通知权限被拒绝时，后台提醒不可用（前台功能不受影响）。
-- 运行结果不持久化，退出/结束后无法恢复。
+- 运行结果不持久化，退出/结束后无法恢复；进程被杀后没有 Session 恢复。这是当前架构的既有明确边界，本轮没有新增持久化。
+- COUNT 没有独立的“暂停”执行状态，也不提供逐次计数；它是目标次数 + 开始/完成节点。切换或跳过时保留 RUNNING 执行状态；TIMER 的暂停/继续语义保持不变。
 - 执行历史和卡片拖拽排序不在本次范围；流程名称编辑已支持。
+- iOS 模拟器不提供真实触觉；Android 模拟器无真实马达。触觉触发路径由单元测试和平台 API 验证，手感需真机验收。

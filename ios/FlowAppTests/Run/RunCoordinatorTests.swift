@@ -335,6 +335,149 @@ final class RunCoordinatorTests: XCTestCase {
         }
     }
 
+    func testSkipKeepsNodeVisibleInTheRollerSnapshot() {
+        let coordinator = makeCoordinator()
+        _ = startedSnapshot(coordinator.start(plan: makePlan([
+            makeCount(id: "c1"),
+            makeCount(id: "c2")
+        ])))
+        XCTAssertTrue(coordinator.startNode())
+        XCTAssertTrue(coordinator.skipCurrent())
+
+        let snapshot = coordinator.currentSnapshot
+        XCTAssertEqual(snapshot?.nodeIndex, 1)
+        XCTAssertEqual(snapshot?.nodeStatuses[0], .skipped)
+        XCTAssertEqual(snapshot?.visibleNodeIndices, [0, 1])
+        XCTAssertEqual(snapshot?.completedNodes, 0)
+        XCTAssertEqual(snapshot?.skippedNodes, 1)
+
+        // A skipped node can be selected again through the official entry.
+        XCTAssertTrue(coordinator.selectNode(0))
+        let resumed = coordinator.currentSnapshot
+        XCTAssertEqual(resumed?.nodeIndex, 0)
+        XCTAssertEqual(resumed?.nodeStatuses[0], .current)
+        XCTAssertEqual(resumed?.skippedNodes, 0)
+    }
+
+    func testSelectNodeDefersPreviousAndCancelsTimerNotification() {
+        let coordinator = makeCoordinator()
+        clock.now = 0
+        _ = startedSnapshot(coordinator.start(plan: makePlan([
+            makeTimer(ms: 30_000),
+            makeCount(id: "c2", name: "深蹲")
+        ])))
+        XCTAssertTrue(coordinator.startNode())
+        clock.advance(10_000)
+        let pausedBefore = notifications.events.filter { $0 == "timerPaused" }.count
+
+        XCTAssertTrue(coordinator.selectNode(1))
+        let snapshot = coordinator.currentSnapshot
+        XCTAssertEqual(snapshot?.nodeIndex, 1)
+        XCTAssertEqual(snapshot?.nodeStatuses[0], .deferred)
+        XCTAssertEqual(snapshot?.nodeState, .ready)
+        XCTAssertEqual(snapshot?.completedNodes, 0)
+        XCTAssertEqual(notifications.events.filter { $0 == "timerPaused" }.count, pausedBefore + 1)
+    }
+
+    func testSelectNodeRestoresDeferredTimerProgress() {
+        let coordinator = makeCoordinator()
+        clock.now = 0
+        _ = startedSnapshot(coordinator.start(plan: makePlan([
+            makeTimer(ms: 30_000),
+            makeCount(id: "c2", name: "深蹲")
+        ])))
+        XCTAssertTrue(coordinator.startNode())
+        clock.advance(10_000)
+        XCTAssertTrue(coordinator.selectNode(1))
+        clock.advance(60_000)
+        XCTAssertTrue(coordinator.selectNode(0))
+
+        let restored = coordinator.currentSnapshot
+        XCTAssertEqual(restored?.nodeState, .paused)
+        XCTAssertEqual(restored?.remainingMs, 20_000)
+        XCTAssertTrue(coordinator.resume())
+    }
+
+    func testSkipCurrentRejectsLastActiveNodeAndCompletingItKeepsSkippedSummary() {
+        let coordinator = makeCoordinator()
+        _ = startedSnapshot(coordinator.start(plan: makePlan([
+            makeCount(id: "c1"),
+            makeCount(id: "c2")
+        ])))
+        XCTAssertTrue(coordinator.skipCurrent())
+        XCTAssertEqual(coordinator.currentSnapshot?.completedNodes, 0)
+        XCTAssertEqual(coordinator.currentSnapshot?.skippedNodes, 1)
+
+        // c2 is the only remaining active node; keeping it avoids ending the
+        // run and losing the skipped-node re-entry path.
+        XCTAssertFalse(coordinator.skipCurrent())
+        XCTAssertTrue(coordinator.startNode())
+        XCTAssertTrue(coordinator.completeNode())
+        guard case .finished(let summary) = coordinator.runtime else {
+            XCTFail("Expected finished runtime")
+            return
+        }
+        XCTAssertEqual(summary.completedNodes, 1)
+        XCTAssertEqual(summary.skippedNodes, 1)
+        XCTAssertTrue(summary.completedNormally)
+        XCTAssertTrue(notifications.events.contains("finished"))
+    }
+
+    func testSkippingTimerCancelsNotificationWithoutCompletingIt() {
+        let coordinator = makeCoordinator()
+        clock.now = 0
+        _ = startedSnapshot(coordinator.start(plan: makePlan([
+            makeTimer(ms: 10_000),
+            makeCount(id: "c2")
+        ])))
+        XCTAssertTrue(coordinator.startNode())
+        clock.advance(2_000)
+        XCTAssertTrue(coordinator.skipCurrent())
+
+        let snapshot = coordinator.currentSnapshot
+        XCTAssertEqual(snapshot?.nodeStatuses[0], .skipped)
+        XCTAssertEqual(snapshot?.completedNodes, 0)
+        XCTAssertFalse(notifications.events.contains("timerCompleted"))
+        XCTAssertTrue(notifications.events.contains("timerPaused"))
+    }
+
+    func testExpiryFeedbackTokenIsOneShotAndConsumable() {
+        let coordinator = makeCoordinator()
+        clock.now = 0
+        _ = startedSnapshot(coordinator.start(plan: makePlan([makeTimer(ms: 2_000)])))
+        XCTAssertTrue(coordinator.startNode())
+        clock.advance(2_000)
+        XCTAssertTrue(coordinator.refresh())
+
+        guard let token = coordinator.expiryFeedbackToken else {
+            XCTFail("Expected an expiry feedback token")
+            return
+        }
+        XCTAssertEqual(notifications.expired, 1)
+
+        // Further refreshes must not produce another UI feedback token.
+        coordinator.refresh()
+        XCTAssertEqual(coordinator.expiryFeedbackToken, token)
+
+        coordinator.consumeExpiryFeedback(token)
+        XCTAssertNil(coordinator.expiryFeedbackToken)
+        coordinator.refresh()
+        XCTAssertNil(coordinator.expiryFeedbackToken)
+        XCTAssertEqual(notifications.expired, 1)
+    }
+
+    func testExpiryFeedbackTokenResetsWhenRunEnds() {
+        let coordinator = makeCoordinator()
+        clock.now = 0
+        _ = startedSnapshot(coordinator.start(plan: makePlan([makeTimer(ms: 2_000)])))
+        XCTAssertTrue(coordinator.startNode())
+        clock.advance(2_000)
+        coordinator.refresh()
+        XCTAssertNotNil(coordinator.expiryFeedbackToken)
+        XCTAssertTrue(coordinator.completeNode())
+        XCTAssertNil(coordinator.expiryFeedbackToken)
+    }
+
     private final class RecordingNotifications: RunNotificationSink {
         var events: [String] = []
         var expired = 0

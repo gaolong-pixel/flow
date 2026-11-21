@@ -82,6 +82,12 @@ class RunCoordinator(
     private val _runtime = MutableStateFlow<RunRuntimeState>(RunRuntimeState.Idle)
     val runtime: StateFlow<RunRuntimeState> = _runtime.asStateFlow()
 
+    // One-shot UI expiry feedback token. It is process-scoped (not stored in
+    // the view) so a recomposition or a return from background cannot replay
+    // the shake for an already-consumed TIMER expiry.
+    private val _expiryFeedback = MutableStateFlow<Long?>(null)
+    val expiryFeedback: StateFlow<Long?> = _expiryFeedback.asStateFlow()
+
     init {
         // A fresh process must not revive a previous run or its notifications.
         background.clearStale()
@@ -99,6 +105,7 @@ class RunCoordinator(
         val fresh = controllerFactory(plan, initialLoop)
         controller = fresh
         alertedTimerRunId = null
+        _expiryFeedback.value = null
         val snapshot = fresh.snapshot()
         _runtime.value = RunRuntimeState.Active(snapshot)
         notifications.onRunStarted(snapshot)
@@ -124,6 +131,55 @@ class RunCoordinator(
             notifications.onTimerStarted(snapshot)
         }
         drainHaptics(active, allowDirectHaptics = true)
+        true
+    }
+
+    /**
+     * Switches the execution target. The controller freezes a running TIMER and
+     * marks the previous node DEFERRED. Timer notifications must be cancelled
+     * before the new node is published so a deferred timer can never fire an
+     * out-of-date alert.
+     */
+    fun selectNode(targetIndex: Int): Boolean = synchronized(lock) {
+        val active = controller ?: return false
+        val before = active.snapshot()
+        if (!active.selectNode(targetIndex)) return false
+        if (before.node?.type == StepType.TIMER &&
+            before.nodeState != NodeRunState.READY
+        ) {
+            notifications.onTimerPaused(before)
+        }
+        drainHaptics(active, allowDirectHaptics = true)
+        val snapshot = active.snapshot()
+        publish(snapshot)
+        notifications.onProgress(snapshot)
+        true
+    }
+
+    /** Explicitly skips the current node through the scheduler extension. */
+    fun skipCurrent(): Boolean = synchronized(lock) {
+        val active = controller ?: return false
+        val before = active.snapshot()
+        if (!active.skipCurrent()) return false
+        if (before.node?.type == StepType.TIMER &&
+            before.nodeState != NodeRunState.READY
+        ) {
+            notifications.onTimerPaused(before)
+        }
+        drainHaptics(active, allowDirectHaptics = true)
+        val snapshot = active.snapshot()
+        if (snapshot.finalized) {
+            val summary = active.finishedSummary() ?: return false
+            controller = null
+            alertedTimerRunId = null
+            _expiryFeedback.value = null
+            notifications.onRunFinished(summary)
+            background.stop(summary.runId)
+            _runtime.value = RunRuntimeState.Finished(summary)
+            return true
+        }
+        publish(snapshot)
+        notifications.onProgress(snapshot)
         true
     }
 
@@ -173,6 +229,7 @@ class RunCoordinator(
             val summary = active.finishedSummary() ?: return false
             controller = null
             alertedTimerRunId = null
+            _expiryFeedback.value = null
             notifications.onRunFinished(summary)
             background.stop(summary.runId)
             _runtime.value = RunRuntimeState.Finished(summary)
@@ -246,6 +303,7 @@ class RunCoordinator(
         val summary = active.exit() ?: return null
         controller = null
         alertedTimerRunId = null
+        _expiryFeedback.value = null
         notifications.onRunExited(summary)
         background.stop(summary.runId)
         _runtime.value = RunRuntimeState.Idle
@@ -269,6 +327,7 @@ class RunCoordinator(
         if (snapshot.nodeState != NodeRunState.EXPIRED) return
         if (alertedTimerRunId == timerId) return
         alertedTimerRunId = timerId
+        _expiryFeedback.value = timerId
         // Foreground expiry is haptic-only; background expiry is delivered by
         // the notification sink. postTimerExpired is a no-op on iOS.
         if (!uiVisible) {
@@ -284,6 +343,14 @@ class RunCoordinator(
                 RunHapticEvent.TIMER_EXPIRED -> haptics.timerExpired()
             }
         }
+    }
+
+    /**
+     * Marks the expiry feedback token consumed after the UI has played it once.
+     * Calling this for an older token never clears a newer expiry.
+     */
+    fun consumeExpiryFeedback(timerRunId: Long) {
+        if (_expiryFeedback.value == timerRunId) _expiryFeedback.value = null
     }
 
     /** Test/UI helper: whether the current node is the last one. */

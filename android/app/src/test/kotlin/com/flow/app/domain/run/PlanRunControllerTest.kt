@@ -449,4 +449,271 @@ class PlanRunControllerTest {
             // expected
         }
     }
+
+    @Test
+    fun initialSchedulingStatusExposesFirstNodeAsCurrent() {
+        val run = controller(plan(count(), timer(), count(id = "c2", name = "深蹲")))
+        val snapshot = run.snapshot()
+
+        assertEquals(
+            listOf(NodeStatus.CURRENT, NodeStatus.PENDING, NodeStatus.PENDING),
+            snapshot.nodeStatuses
+        )
+        assertEquals(listOf(0, 1, 2), snapshot.visibleNodeIndices)
+        assertEquals(0, snapshot.skippedNodes)
+        assertTrue(snapshot.isFinalNode.not())
+    }
+
+    @Test
+    fun switchingFromRunningCountDefersItWithoutLosingRunningState() {
+        val run = controller(plan(count(target = 5), timer()))
+        run.startNode()
+
+        assertTrue(run.selectNode(1))
+        val switched = run.snapshot()
+        assertEquals(1, switched.nodeIndex)
+        assertEquals(NodeStatus.DEFERRED, switched.nodeStatuses[0])
+        assertEquals(0, switched.completedNodes)
+
+        assertTrue(run.selectNode(0))
+        val restored = run.snapshot()
+        assertEquals(0, restored.nodeIndex)
+        assertEquals(NodeRunState.RUNNING, restored.nodeState)
+        assertFalse(run.startNode()) // it is already running; no artificial restart
+    }
+
+    @Test
+    fun switchingFromRunningTimerFreezesRemainingAndRestoresPausedState() {
+        val run = controller(plan(timer(ms = 60_000L), count()))
+        clock.now = 0L
+        run.startNode()
+        clock.advance(20_000L)
+
+        assertTrue(run.selectNode(1))
+        val switched = run.snapshot()
+        assertEquals(1, switched.nodeIndex)
+        assertEquals(NodeStatus.DEFERRED, switched.nodeStatuses[0])
+        assertNull(switched.remainingMs) // the COUNT target is current now
+
+        clock.advance(300_000L)
+        assertTrue(run.selectNode(0))
+        val restored = run.snapshot()
+        assertEquals(0, restored.nodeIndex)
+        assertEquals(NodeRunState.PAUSED, restored.nodeState)
+        assertEquals(40_000L, restored.remainingMs)
+
+        assertTrue(run.resume())
+        clock.advance(10_000L)
+        run.refresh()
+        assertEquals(30_000L, run.snapshot().remainingMs)
+    }
+
+    @Test
+    fun switchingAwayFromExpiredTimerKeepsExpiredStateForLaterCompletion() {
+        val run = controller(plan(timer(ms = 5_000L), count()))
+        clock.now = 0L
+        run.startNode()
+        clock.advance(5_000L)
+        run.refresh()
+        assertEquals(NodeRunState.EXPIRED, run.snapshot().nodeState)
+
+        assertTrue(run.selectNode(1))
+        assertEquals(NodeStatus.DEFERRED, run.snapshot().nodeStatuses[0])
+        assertTrue(run.selectNode(0))
+        assertEquals(NodeRunState.EXPIRED, run.snapshot().nodeState)
+        assertEquals(0L, run.snapshot().remainingMs)
+        assertTrue(run.completeNode())
+        assertEquals(NodeStatus.COMPLETED, run.snapshot().nodeStatuses[0])
+        assertEquals(1, run.snapshot().completedNodes)
+    }
+
+    @Test
+    fun completedNodeLeavesRollerAndNextSelectionWrapsAround() {
+        val run = controller(
+            plan(
+                count(id = "c1", name = "一"),
+                count(id = "c2", name = "二"),
+                count(id = "c3", name = "三")
+            )
+        )
+        run.startNode()
+        run.completeNode() // c1 completed, current c2
+        assertEquals(1, run.snapshot().nodeIndex)
+
+        assertTrue(run.selectNode(2)) // switch to c3 without starting c2
+        assertEquals(NodeStatus.PENDING, run.snapshot().nodeStatuses[1])
+        assertEquals(NodeStatus.CURRENT, run.snapshot().nodeStatuses[2])
+
+        run.startNode()
+        run.completeNode() // c3 completed; c2 is the only selectable node left
+        val after = run.snapshot()
+        assertEquals(1, after.nodeIndex)
+        assertEquals(NodeStatus.COMPLETED, after.nodeStatuses[0])
+        assertEquals(NodeStatus.COMPLETED, after.nodeStatuses[2])
+        assertEquals(NodeStatus.CURRENT, after.nodeStatuses[1])
+        assertEquals(listOf(1), after.visibleNodeIndices)
+        assertEquals(2, after.completedNodes)
+
+        run.startNode()
+        run.completeNode()
+        assertTrue(run.snapshot().finalized)
+        assertEquals(3, run.snapshot().completedNodes)
+    }
+
+    @Test
+    fun skipNeverCountsAsCompletedAndCanBeReselected() {
+        val run = controller(plan(count(id = "c1"), timer(ms = 5_000L)))
+        run.startNode() // COUNT is RUNNING
+        assertTrue(run.skipCurrent())
+
+        val skipped = run.snapshot()
+        assertEquals(1, skipped.nodeIndex)
+        assertEquals(0, skipped.completedNodes)
+        assertEquals(1, skipped.skippedNodes)
+        assertEquals(NodeStatus.SKIPPED, skipped.nodeStatuses[0])
+        // The skipped node remains in the roller and is selectable.
+        assertEquals(listOf(0, 1), skipped.visibleNodeIndices)
+
+        assertTrue(run.selectNode(0))
+        val resumed = run.snapshot()
+        assertEquals(0, resumed.nodeIndex)
+        assertEquals(NodeStatus.CURRENT, resumed.nodeStatuses[0])
+        assertEquals(NodeRunState.RUNNING, resumed.nodeState)
+        assertEquals(0, resumed.skippedNodes)
+
+        assertTrue(run.completeNode())
+        assertEquals(1, run.snapshot().completedNodes)
+        assertEquals(NodeStatus.COMPLETED, run.snapshot().nodeStatuses[0])
+        assertEquals(listOf(1), run.snapshot().visibleNodeIndices)
+    }
+
+    @Test
+    fun skippingReadyNodeReselectsFromReady() {
+        val run = controller(plan(count(id = "c1"), count(id = "c2")))
+        assertTrue(run.skipCurrent()) // c1 was never started
+
+        assertTrue(run.selectNode(0))
+        assertEquals(NodeRunState.READY, run.snapshot().nodeState)
+        assertEquals(0, run.snapshot().skippedNodes)
+        assertTrue(run.startNode())
+    }
+
+    @Test
+    fun reselectedSkippedNodeCanBeDeferredAgainAndReselected() {
+        val run = controller(plan(count(id = "c1"), count(id = "c2")))
+        run.startNode()
+        assertTrue(run.skipCurrent()) // c1 SKIPPED (RUNNING retained), c2 current
+        assertTrue(run.selectNode(0)) // c1 CURRENT
+        assertTrue(run.selectNode(1)) // c1 DEFERRED, c2 current
+        assertEquals(NodeStatus.DEFERRED, run.snapshot().nodeStatuses[0])
+        assertTrue(run.selectNode(0))
+        assertEquals(NodeStatus.CURRENT, run.snapshot().nodeStatuses[0])
+        assertEquals(NodeRunState.RUNNING, run.snapshot().nodeState)
+    }
+
+    @Test
+    fun skippingRunningTimerPreservesProgressForReselection() {
+        val run = controller(plan(timer(ms = 10_000L), count()))
+        clock.now = 0L
+        run.startNode()
+        clock.advance(4_000L)
+        assertTrue(run.skipCurrent())
+
+        val skipped = run.snapshot()
+        assertEquals(1, skipped.nodeIndex)
+        assertEquals(NodeStatus.SKIPPED, skipped.nodeStatuses[0])
+        assertEquals(0, skipped.completedNodes)
+        assertEquals(1, skipped.skippedNodes)
+        assertEquals(6_000L, skipped.remainingFor(0))
+
+        assertTrue(run.selectNode(0))
+        val restored = run.snapshot()
+        assertEquals(0, restored.nodeIndex)
+        assertEquals(NodeRunState.PAUSED, restored.nodeState)
+        assertEquals(6_000L, restored.remainingMs)
+        assertEquals(0, restored.skippedNodes)
+        assertTrue(run.resume())
+        clock.advance(1_000L)
+        run.refresh()
+        assertEquals(5_000L, run.snapshot().remainingMs)
+    }
+
+    @Test
+    fun lastActiveNodeCannotBeSkippedAndCompletingItKeepsSkippedSummary() {
+        val run = controller(plan(count(id = "c1"), count(id = "c2")))
+        run.startNode()
+        assertTrue(run.skipCurrent())
+
+        // c2 is the only remaining PENDING/DEFERRED node. Skipping it would
+        // end the run and remove the skipped-node re-entry path, so it is
+        // rejected; the skipped c1 stays selectable in the roller.
+        assertFalse(run.skipCurrent())
+        val active = run.snapshot()
+        assertEquals(1, active.nodeIndex)
+        assertEquals(NodeStatus.SKIPPED, active.nodeStatuses[0])
+        assertEquals(NodeStatus.CURRENT, active.nodeStatuses[1])
+        assertEquals(1, active.skippedNodes)
+        assertFalse(active.finalized)
+
+        run.startNode()
+        run.completeNode()
+        val finished = run.snapshot()
+        assertTrue(finished.finalized)
+        assertEquals(1, finished.completedNodes)
+        assertEquals(1, finished.skippedNodes)
+        val summary = run.finishedSummary()
+        assertEquals(1, summary!!.completedNodes)
+        assertEquals(1, summary.skippedNodes)
+    }
+
+    @Test
+    fun loopResetKeepsNodeCurrent() {
+        val run = controller(plan(count(target = 3), timer()), initialLoop = true)
+        run.startNode()
+
+        assertTrue(run.completeNode())
+        val reset = run.snapshot()
+        assertEquals(0, reset.nodeIndex)
+        assertEquals(NodeRunState.READY, reset.nodeState)
+        assertEquals(NodeStatus.CURRENT, reset.currentNodeStatus)
+        assertEquals(0, reset.completedNodes)
+        assertTrue(reset.loopCurrentNode)
+    }
+
+    @Test
+    fun selectNodeRejectsInvalidAndCompletedTargets() {
+        val run = controller(plan(count(id = "c1"), count(id = "c2"), count(id = "c3")))
+        assertFalse(run.selectNode(0)) // current
+        assertFalse(run.selectNode(-1))
+        assertFalse(run.selectNode(99))
+
+        run.skipCurrent() // c1 skipped, c2 current
+        assertTrue(run.selectNode(0)) // skipped is selectable again
+        assertEquals(0, run.snapshot().nodeIndex)
+        run.startNode()
+        run.completeNode() // c1 completed, c2 current
+        assertEquals(1, run.snapshot().nodeIndex)
+        assertFalse(run.selectNode(0)) // completed
+        assertFalse(run.selectNode(1)) // current
+    }
+
+    @Test
+    fun switchingResetsLoopSettingForTheTargetNode() {
+        val run = controller(plan(timer(ms = 10_000L), count()), initialLoop = true)
+        run.startNode()
+        assertTrue(run.snapshot().loopCurrentNode)
+        assertTrue(run.selectNode(1))
+        assertFalse(run.snapshot().loopCurrentNode)
+    }
+
+    @Test
+    fun exitSummaryCarriesSkippedCount() {
+        val run = controller(plan(count(id = "c1"), count(id = "c2")))
+        run.skipCurrent()
+        val summary = run.exit()
+        assertEquals(1, summary!!.skippedNodes)
+        assertEquals(0, summary.completedNodes)
+        assertEquals(2, summary.totalNodes)
+        assertFalse(summary.completedNormally)
+    }
 }

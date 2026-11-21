@@ -80,12 +80,22 @@ private fun RunResultScaffold(
     val reduceMotion = rememberReduceMotion()
     val haptics = rememberFlowHaptics()
     val confetti = remember { Animatable(0f) }
-    val title = if (completedNormally) "执行完成！" else "已退出流程"
-    val subtitle = if (completedNormally) "太棒了！继续保持！" else "当前节点未计入完成数量"
+    val hadSkips = completedNormally && summary.skippedNodes > 0
+    val celebrate = completedNormally && summary.skippedNodes == 0
+    val title = when {
+        !completedNormally -> "已退出流程"
+        hadSkips -> "本次流程结束"
+        else -> "执行完成！"
+    }
+    val subtitle = when {
+        !completedNormally -> "当前节点未计入完成数量"
+        hadSkips -> "已完成 ${summary.completedNodes} 个节点，跳过 ${summary.skippedNodes} 个"
+        else -> "太棒了！继续保持！"
+    }
 
     LaunchedEffect(summary.runId, completedNormally) {
         confetti.snapTo(0f)
-        if (completedNormally && !reduceMotion) {
+        if (celebrate && !reduceMotion) {
             confetti.animateTo(1f, tween(1100, easing = FastOutSlowInEasing))
             delay(120L)
             haptics.commit()
@@ -121,7 +131,7 @@ private fun RunResultScaffold(
                         .height(250.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (completedNormally) {
+                    if (celebrate) {
                         FlowConfetti(
                             progress = confetti.value,
                             modifier = Modifier.fillMaxSize()
@@ -171,6 +181,19 @@ private fun RunResultScaffold(
                         fontSize = 12.sp,
                         color = FlowSecondaryText
                     )
+                    if (summary.skippedNodes > 0) {
+                        Box(
+                            Modifier
+                                .padding(horizontal = 7.dp)
+                                .size(3.dp)
+                                .background(FlowOutlineStrong, CircleShape)
+                        )
+                        Text(
+                            text = "跳过 ${summary.skippedNodes}",
+                            fontSize = 12.sp,
+                            color = FlowWarmInk
+                        )
+                    }
                 }
                 Spacer(Modifier.height(40.dp))
             }
