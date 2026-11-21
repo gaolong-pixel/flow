@@ -413,6 +413,14 @@ final class RunCoordinatorTests: XCTestCase {
         XCTAssertFalse(coordinator.skipCurrent())
         XCTAssertTrue(coordinator.startNode())
         XCTAssertTrue(coordinator.completeNode())
+        guard case .active(let awaiting) = coordinator.runtime else {
+            XCTFail("Expected active runtime with skipped review")
+            return
+        }
+        XCTAssertTrue(awaiting.awaitingSkippedDecision)
+        XCTAssertFalse(awaiting.finalized)
+
+        XCTAssertTrue(coordinator.finishAfterSkippedReview())
         guard case .finished(let summary) = coordinator.runtime else {
             XCTFail("Expected finished runtime")
             return

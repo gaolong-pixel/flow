@@ -657,6 +657,16 @@ class PlanRunControllerTest {
 
         run.startNode()
         run.completeNode()
+        val awaiting = run.snapshot()
+        assertFalse(awaiting.finalized)
+        assertTrue(awaiting.awaitingSkippedDecision)
+        assertEquals(1, awaiting.completedNodes)
+        assertEquals(1, awaiting.skippedNodes)
+        assertEquals(0, awaiting.nodeIndex)
+        assertEquals(NodeStatus.SKIPPED, awaiting.nodeStatuses[0])
+        assertEquals(NodeStatus.COMPLETED, awaiting.nodeStatuses[1])
+
+        assertTrue(run.finishAfterSkippedReview())
         val finished = run.snapshot()
         assertTrue(finished.finalized)
         assertEquals(1, finished.completedNodes)
@@ -664,6 +674,34 @@ class PlanRunControllerTest {
         val summary = run.finishedSummary()
         assertEquals(1, summary!!.completedNodes)
         assertEquals(1, summary.skippedNodes)
+    }
+
+    @Test
+    fun skippedReviewCanGoBackAndCompleteAllNodes() {
+        val run = controller(plan(count(id = "c1"), count(id = "c2")))
+        run.startNode()
+        assertTrue(run.skipCurrent()) // c1 RUNNING -> SKIPPED
+        run.startNode()
+        run.completeNode() // c2 completed, c1 still skipped -> review
+
+        val awaiting = run.snapshot()
+        assertTrue(awaiting.awaitingSkippedDecision)
+        assertFalse(awaiting.finalized)
+
+        assertTrue(run.resumeSkippedAfterReview())
+        val resumed = run.snapshot()
+        assertFalse(resumed.awaitingSkippedDecision)
+        assertEquals(0, resumed.nodeIndex)
+        assertEquals(NodeStatus.CURRENT, resumed.nodeStatuses[0])
+        assertEquals(NodeRunState.RUNNING, resumed.nodeState)
+        assertEquals(0, resumed.skippedNodes)
+
+        assertTrue(run.completeNode())
+        val finished = run.snapshot()
+        assertTrue(finished.finalized)
+        assertEquals(2, finished.completedNodes)
+        assertEquals(0, finished.skippedNodes)
+        assertEquals(0, finished.skippedNodeIndices.size)
     }
 
     @Test

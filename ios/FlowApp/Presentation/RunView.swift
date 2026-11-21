@@ -43,6 +43,11 @@ struct RunView: View {
             }
             CompletionFlashView(progress: completionFlash)
                 .allowsHitTesting(false)
+            if snapshot.awaitingSkippedDecision {
+                skippedReviewOverlay
+                    .transition(.opacity)
+                    .zIndex(5)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -94,6 +99,76 @@ struct RunView: View {
         } message: {
             Text(exitMessage)
         }
+    }
+
+    private var skippedReviewOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Text("已经到最后一步啦")
+                    .flowFont(21, weight: .semibold)
+                    .foregroundColor(FlowPalette.runText)
+                Text("之前还有 \(snapshot.skippedNodes) 个节点被跳过，是否回去完成？")
+                    .flowFont(14)
+                    .foregroundColor(FlowPalette.runSecondaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("选择「直接结束」会保留跳过记录并直接进入结果页。")
+                    .flowFont(11)
+                    .foregroundColor(FlowPalette.runMutedText)
+                    .multilineTextAlignment(.center)
+
+                VStack(spacing: 9) {
+                    Button {
+                        _ = coordinator.resumeSkippedAfterReview()
+                    } label: {
+                        Text("去完成跳过节点")
+                            .flowFont(15, weight: .semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(FlowPalette.primaryBright)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("skipped-review-resume")
+
+                    Button {
+                        _ = coordinator.finishAfterSkippedReview()
+                    } label: {
+                        Text("直接结束")
+                            .flowFont(14, weight: .medium)
+                            .foregroundColor(FlowPalette.runSecondaryText)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(FlowPalette.runSurfaceRaised)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("直接结束并查看结果")
+                    .accessibilityIdentifier("skipped-review-finish")
+                }
+                .padding(.top, 4)
+            }
+            .padding(24)
+            .frame(maxWidth: 340)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(FlowPalette.runSurface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(FlowPalette.runOutline, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
+        }
+        .accessibilityIdentifier("skipped-review-overlay")
     }
 
     private var exitMessage: String {

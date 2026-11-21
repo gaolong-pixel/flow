@@ -1,17 +1,17 @@
 # Flow
 
-Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。Android 当前版本为 0.1.2；iOS 源码仍为 0.1.0，本次未发布 iOS 安装包。已完成计划创建/编辑/持久化、双端计划运行闭环、纵向 3D 流程滚筒、COUNT 目标次数与平静呼吸等待、TIMER 双环倒计时与到期反馈、自由切换与暂缓调度、跳过节点保留且可重新选择、已完成归档、单节点循环、退出/结束反馈，以及 Android 前台服务通知与 iOS 本地通知。
+Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流程执行应用。Android 当前版本为 0.1.3；iOS 源码仍为 0.1.0，本次未发布 iOS 安装包。已完成计划创建/编辑/持久化、双端计划运行闭环、纵向 3D 流程滚筒、COUNT 目标次数与平静呼吸等待、TIMER 双环倒计时与到期反馈、自由切换与暂缓调度、跳过节点保留且可重新选择、已完成归档、单节点循环、退出/结束反馈，以及 Android 前台服务通知与 iOS 本地通知。
 
 ## 已确定配置
 - Android：Kotlin + Jetpack Compose，最低 Android 10 / API 29；当前 `compileSdk/targetSdk = 33`，包名 `com.flow.app`
 - iOS：Swift + SwiftUI，最低 iOS 16；Bundle Identifier `com.flow.app`
-- UI：reference v2 插画背景与统一设计 Token；Android 0.1.2 已完成首页、准备页、COUNT/TIMER、完成页视觉改造与执行滚筒 v2。
+- UI：reference v2 插画背景与统一设计 Token；Android 0.1.3 已完成首页、准备页、COUNT/TIMER、完成页视觉改造与执行滚筒 v2。
 - 首版本地优先，无账号、无服务端。
 
-## 0.1.2 状态
+## 0.1.3 状态
 
-- Android 0.1.2 Release APK 随本次 v0.1.2 GitHub Release 提供，使用既有正式签名材料构建。
-- Android 包名 `com.flow.app`，versionCode `3`，versionName `0.1.2`，minSdk 29。
+- Android 0.1.3 Release APK 随本次 v0.1.3 GitHub Release 提供，使用既有正式签名材料构建。
+- Android 包名 `com.flow.app`，versionCode `4`，versionName `0.1.3`，minSdk 29。
 - iOS 源码仍为 0.1.0 范围；本次不发布 iOS 安装包。
 - Release APK 和本地验收截图/记录不进入源码提交，由 GitHub Release 附件或本地归档单独管理。
 - Android Release 签名配置见 [Android Release 签名配置](docs/ANDROID_RELEASE_SIGNING.md)。
@@ -37,7 +37,7 @@ Flow 是 Android/Kotlin + Jetpack Compose 与 iOS/Swift + SwiftUI 的原生流�
 2. 点击计划卡片上的“开始”进入启动设置；运行时默认推荐第一个待执行节点，但不强制线性执行：点击任意待执行/暂缓节点即可切换执行目标。单节点循环只在运行页控制（默认关闭）。
 3. 运行页为纵向 3D 滚筒：当前节点展开并占据主要视觉区域，上下相邻节点按距离缩放、淡出和透视旋转；滚动只浏览，点击才切换执行目标。
 4. COUNT 支持开始、完成；开始后进入平静的呼吸等待，不要求逐次点击计数，目标次数仅作信息展示。TIMER 支持真实倒计时、暂停、继续、到期和提前完成。
-5. 切换执行目标时，正在运行的 TIMER 会被冻结并标记为暂缓；跳过节点保留在滚筒中并标记“已跳过”，不计入完成，但可以重新选择并恢复此前进度；最后一个活动节点的跳过会被拒绝，避免流程结束导致跳过节点失去入口。完成节点进入默认折叠的“已完成”区域。
+5. 切换执行目标时，正在运行的 TIMER 会被冻结并标记为暂缓；跳过节点保留在滚筒中并标记“已跳过”，不计入完成，但可以重新选择并恢复此前进度；最后一个活动节点的跳过会被拒绝，避免流程结束导致跳过节点失去入口。完成节点进入默认折叠的“已完成”区域。当最后一个可执行节点完成且仍有跳过节点时，会先提示“去完成跳过节点”或“直接结束”，不会立即收尾。
 6. 运行期间可随时开关“当前节点循环”。循环完成后重置当前节点且不计入完成节点数；关闭循环本身不推进节点。
 5. 编辑页顶部可填写/修改流程名称；名称随保存与节点一起持久化，空名称不可保存。
 6. 主动退出会展示“已退出流程”和已完成节点数；全部节点完成后展示“流程已完成”结果页；两者都可返回首页。

@@ -566,6 +566,16 @@ final class PlanRunControllerTests: XCTestCase {
 
         _ = run.startNode()
         _ = run.completeNode()
+        let awaiting = run.snapshot()
+        XCTAssertFalse(awaiting.finalized)
+        XCTAssertTrue(awaiting.awaitingSkippedDecision)
+        XCTAssertEqual(awaiting.completedNodes, 1)
+        XCTAssertEqual(awaiting.skippedNodes, 1)
+        XCTAssertEqual(awaiting.nodeIndex, 0)
+        XCTAssertEqual(awaiting.nodeStatuses[0], .skipped)
+        XCTAssertEqual(awaiting.nodeStatuses[1], .completed)
+
+        XCTAssertTrue(run.finishAfterSkippedReview())
         let finished = run.snapshot()
         XCTAssertTrue(finished.finalized)
         XCTAssertEqual(finished.completedNodes, 1)
@@ -573,6 +583,33 @@ final class PlanRunControllerTests: XCTestCase {
         let summary = run.finishedSummary()
         XCTAssertEqual(summary?.completedNodes, 1)
         XCTAssertEqual(summary?.skippedNodes, 1)
+    }
+
+    func testSkippedReviewCanGoBackAndCompleteAllNodes() {
+        let run = makeController(makePlan([makeCount(id: "c1"), makeCount(id: "c2")]))
+        _ = run.startNode()
+        XCTAssertTrue(run.skipCurrent()) // c1 RUNNING -> SKIPPED
+        _ = run.startNode()
+        _ = run.completeNode() // c2 completed, c1 still skipped -> review
+
+        let awaiting = run.snapshot()
+        XCTAssertTrue(awaiting.awaitingSkippedDecision)
+        XCTAssertFalse(awaiting.finalized)
+
+        XCTAssertTrue(run.resumeSkippedAfterReview())
+        let resumed = run.snapshot()
+        XCTAssertFalse(resumed.awaitingSkippedDecision)
+        XCTAssertEqual(resumed.nodeIndex, 0)
+        XCTAssertEqual(resumed.nodeStatuses[0], .current)
+        XCTAssertEqual(resumed.nodeState, .running)
+        XCTAssertEqual(resumed.skippedNodes, 0)
+
+        XCTAssertTrue(run.completeNode())
+        let finished = run.snapshot()
+        XCTAssertTrue(finished.finalized)
+        XCTAssertEqual(finished.completedNodes, 2)
+        XCTAssertEqual(finished.skippedNodes, 0)
+        XCTAssertTrue(finished.skippedNodeIndices.isEmpty)
     }
 
     func testLoopResetKeepsNodeCurrent() {

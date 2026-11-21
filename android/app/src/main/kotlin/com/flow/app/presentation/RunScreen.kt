@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.flow.app.domain.model.StepType
@@ -166,7 +167,11 @@ fun RunScreen(
         }
     }
 
-    BackHandler { showExitConfirmation = true }
+    BackHandler {
+        // The skipped-node prompt requires an explicit choice; back must not
+        // silently leave or dismiss it.
+        if (!snapshot.awaitingSkippedDecision) showExitConfirmation = true
+    }
 
     Box(Modifier.fillMaxSize()) {
         FlowDarkArt()
@@ -260,6 +265,50 @@ fun RunScreen(
             dismissButton = {
                 TextButton(onClick = { showExitConfirmation = false }) {
                     Text("继续运行", color = FlowRunSecondaryText)
+                }
+            }
+        )
+    }
+
+    if (snapshot.awaitingSkippedDecision) {
+        AlertDialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false
+            ),
+            containerColor = FlowRunSurface,
+            tonalElevation = 0.dp,
+            titleContentColor = FlowRunText,
+            textContentColor = FlowRunSecondaryText,
+            title = { Text("已经到最后一步啦", fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("之前还有 ${snapshot.skippedNodes} 个节点被跳过，是否回去完成？")
+                    Text(
+                        "选择「直接结束」会保留跳过记录并直接进入结果页。",
+                        color = FlowRunMutedText
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        haptics.tick()
+                        coordinator.resumeSkippedAfterReview()
+                    }
+                ) {
+                    Text("去完成跳过节点", color = FlowPrimaryBright)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        haptics.tick()
+                        coordinator.finishAfterSkippedReview()
+                    }
+                ) {
+                    Text("直接结束", color = FlowRunSecondaryText)
                 }
             }
         )

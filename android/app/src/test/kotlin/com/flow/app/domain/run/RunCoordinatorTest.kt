@@ -479,6 +479,11 @@ class RunCoordinatorTest {
         assertFalse(coordinator.skipCurrent())
         assertTrue(coordinator.startNode())
         assertTrue(coordinator.completeNode())
+        val awaiting = (coordinator.runtime.value as RunRuntimeState.Active).snapshot
+        assertTrue(awaiting.awaitingSkippedDecision)
+        assertFalse(awaiting.finalized)
+
+        assertTrue(coordinator.finishAfterSkippedReview())
         val finished = coordinator.runtime.value as RunRuntimeState.Finished
         assertEquals(1, finished.summary.completedNodes)
         assertEquals(1, finished.summary.skippedNodes)

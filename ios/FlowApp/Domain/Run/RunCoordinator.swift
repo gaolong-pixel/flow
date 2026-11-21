@@ -244,6 +244,31 @@ final class RunCoordinator: ObservableObject {
         return true
     }
 
+    /// After the last executable node is completed, the controller waits if
+    /// skipped nodes remain. This resumes the first skipped node.
+    @discardableResult
+    func resumeSkippedAfterReview() -> Bool {
+        guard let active = controller, active.resumeSkippedAfterReview() else { return false }
+        drainHaptics(active)
+        let snapshot = active.snapshot()
+        publish(snapshot)
+        notifications.onProgress(snapshot)
+        return true
+    }
+
+    /// Ends the run after the skipped-nodes prompt, preserving the summary.
+    @discardableResult
+    func finishAfterSkippedReview() -> Bool {
+        guard let active = controller, active.finishAfterSkippedReview() else { return false }
+        guard let summary = active.finishedSummary() else { return false }
+        controller = nil
+        alertedTimerRunID = nil
+        expiryFeedbackToken = nil
+        notifications.onRunFinished(summary)
+        runtime = .finished(summary)
+        return true
+    }
+
     @discardableResult
     func setLoop(_ enabled: Bool) -> Bool {
         guard let active = controller, active.setLoop(enabled) else { return false }

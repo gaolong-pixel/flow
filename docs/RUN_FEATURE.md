@@ -32,7 +32,7 @@
             ├─ 当前节点循环：开启后完成 → 重置当前节点（不计完成数）
             ├─ 已完成区域：折叠 / 展开；完成节点从滚筒移除
             ├─ 退出 → 退出确认 → 已退出流程页（X/Y + 跳过数）→ 首页
-            └─ 所有可执行节点完成 / 用户结束 → 结果页 → 首页
+            └─ 所有可执行节点完成 → 有跳过节点则询问去完成/直接结束 → 结果页 → 首页
 ```
 
 运行期间不提供编辑入口；计划列表在运行页背后不可达，退出/结束前不能启动第二个计划。
@@ -48,7 +48,7 @@
 - `RUNNING`：COUNT 已开始 / TIMER 已建立单调时钟 deadline。
 - `PAUSED`：TIMER 剩余时间冻结，继续时从剩余时间建立新 deadline。
 - `EXPIRED`：TIMER 归零；**不会自动完成节点**，必须用户点击“完成本节点”。
-- 所有可执行节点完成，或用户主动结束后运行结束；跳过节点在运行结束前始终保留在滚筒中并可重新选择。循环迭代不增加完成节点数，跳过也不计入完成数。
+- 所有可执行节点完成，或用户主动结束后运行结束；若最后一个可执行节点完成时仍有跳过节点，先提示「去完成跳过节点」或「直接结束」，选择去完成会恢复第一个跳过节点的进度。跳过节点在运行结束前始终保留在滚筒中并可重新选择。循环迭代不增加完成节点数，跳过也不计入完成数。
 - 每次启动默认循环关闭；启动设置不提供循环入口，运行页可随时开关。推进到下一节点时循环自动关闭（“循环只作用于当前节点”）。
 - 关闭循环本身不推进节点，不重置剩余时间；只有点击完成才推进。
 - 循环完成时：当前节点回到 `READY`，TIMER 重置为完整时长，COUNT 重新展示目标数量，不自动开始下一轮。
@@ -139,10 +139,10 @@
 
 ## 9. 测试与验证
 
-- Android JVM（173 tests / 0 failures）：`PlanRunControllerTest`、`RunCoordinatorTest`、`RunFormattingTest` 覆盖状态转换、COUNT/TIMER、暂停/继续/到期、循环、退出统计、单实例、通知回调、后台生命周期、不持久化、Parser 共享用例，以及本轮新增的调度状态、切换/暂缓、跳过保留、归档选择回绕、到期 token 一次性。
-- iOS XCTest（167 tests / 0 failures）：对应 `PlanRunControllerTests`、`RunCoordinatorTests`、`RunNotificationSinkTests`、`RunFormattingTests`，新增用例与 Android 同构。
-- iOS XCUITest（最终 8 tests / 0 failures）：
-  - `FlowRunFlowUITests`：既有两计划全链路、启动倒计时、新增 `testRollerSchedulingAndScreenshots`（初始滚筒、COUNT 目标等待、切换暂缓、TIMER 当前、完成归档折叠/展开）、`testSkippedNodeCanBeReselectedAndCompleted`（跳过、重新选择并恢复 RUNNING、最后活动跳过禁用、结果页）、`testTimerExpiryFeedbackInForeground`（前台到期反馈）。
+- Android JVM（174 tests / 0 failures）：`PlanRunControllerTest`、`RunCoordinatorTest`、`RunFormattingTest` 覆盖状态转换、COUNT/TIMER、暂停/继续/到期、循环、退出统计、单实例、通知回调、后台生命周期、不持久化、Parser 共享用例，以及本轮新增的调度状态、切换/暂缓、跳过保留、归档选择回绕、到期 token 一次性。
+- iOS XCTest（168 tests / 0 failures）：对应 `PlanRunControllerTests`、`RunCoordinatorTests`、`RunNotificationSinkTests`、`RunFormattingTests`，新增用例与 Android 同构。
+- iOS XCUITest（最终 9 tests / 0 failures）：
+  - `FlowRunFlowUITests`：既有两计划全链路、启动倒计时、新增 `testSkippedReviewCanGoBackAndComplete`（最后一个活动节点完成后去完成跳过节点）、 `testRollerSchedulingAndScreenshots`（初始滚筒、COUNT 目标等待、切换暂缓、TIMER 当前、完成归档折叠/展开）、`testSkippedNodeCanBeReselectedAndCompleted`（跳过、重新选择并恢复 RUNNING、最后活动跳过禁用、跳过节点回顾、直接结束结果页）、`testTimerExpiryFeedbackInForeground`（前台到期反馈）。
   - `FlowPlanNamingUITests`：流程命名/删除确认。
   - `FlowTimerNotificationUITests`：后台 2 秒 TIMER，验证系统本地通知实际到达，回到前台显示到期且不自动完成。
 - Android 模拟器（API 37）：ADB 人工走查初始滚筒、COUNT 目标等待、切换 TIMER、暂停/恢复、完成归档折叠/展开、跳过保留、到期、前后台剩余时间与暂停冻结。

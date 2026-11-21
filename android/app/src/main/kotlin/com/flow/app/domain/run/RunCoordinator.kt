@@ -240,6 +240,34 @@ class RunCoordinator(
         true
     }
 
+    /**
+     * After the last executable node is completed, the controller waits if
+     * skipped nodes remain. This resumes the first skipped node.
+     */
+    fun resumeSkippedAfterReview(): Boolean = synchronized(lock) {
+        val active = controller ?: return false
+        if (!active.resumeSkippedAfterReview()) return false
+        drainHaptics(active, allowDirectHaptics = true)
+        val snapshot = active.snapshot()
+        publish(snapshot)
+        notifications.onProgress(snapshot)
+        true
+    }
+
+    /** Ends the run after the skipped-nodes prompt, preserving the summary. */
+    fun finishAfterSkippedReview(): Boolean = synchronized(lock) {
+        val active = controller ?: return false
+        if (!active.finishAfterSkippedReview()) return false
+        val summary = active.finishedSummary() ?: return false
+        controller = null
+        alertedTimerRunId = null
+        _expiryFeedback.value = null
+        notifications.onRunFinished(summary)
+        background.stop(summary.runId)
+        _runtime.value = RunRuntimeState.Finished(summary)
+        true
+    }
+
     fun setLoop(enabled: Boolean): Boolean = synchronized(lock) {
         val active = controller ?: return false
         val changed = active.setLoop(enabled)
